@@ -1,0 +1,51 @@
+<Layouts.app flash={@flash}>
+  <.header>
+    Payloads
+    <:subtitle>Saved payload templates, ready to preview through a recipe.</:subtitle>
+    <:actions>
+      <.button variant="primary" navigate={~p"/payloads/new"}>New payload</.button>
+    </:actions>
+  </.header>
+
+  <div :if={@payloads == []} class="card bg-base-100 shadow-sm">
+    <div class="card-body items-center text-center">
+      <p class="text-base-content/70">No payloads yet.</p>
+      <.button navigate={~p"/payloads/new"}>Create the first payload</.button>
+    </div>
+  </div>
+
+  <.table :if={@payloads != []} id="payloads" rows={@payloads}>
+    <:col :let={payload} label="Name">
+      <div class="font-medium">{payload.name}</div>
+      <div :if={payload.description} class="text-xs text-base-content/60">
+        {payload.description}
+      </div>
+    </:col>
+    <:col :let={payload} label="Recipe">
+      {if payload.recipe, do: payload.recipe.name, else: "—"}
+    </:col>
+    <:col :let={payload} label="Tags">
+      <div class="flex flex-wrap gap-1">
+        <span :for={tag <- payload.tags} class="badge badge-ghost badge-sm">{tag.name}</span>
+        <span :if={payload.tags == []} class="text-base-content/50">—</span>
+      </div>
+    </:col>
+    <:action :let={payload}>
+      <.link navigate={~p"/generate?payload_id=#{payload.id}"} class="btn btn-ghost btn-xs">
+        Generate
+      </.link>
+      <.link navigate={~p"/payloads/#{payload.id}/edit"} class="btn btn-ghost btn-xs">
+        Edit
+      </.link>
+      <button
+        type="button"
+        class="btn btn-ghost btn-xs text-error"
+        phx-click="delete"
+        phx-value-id={payload.id}
+        data-confirm="Delete this payload?"
+      >
+        Delete
+      </button>
+    </:action>
+  </.table>
+</Layouts.app>

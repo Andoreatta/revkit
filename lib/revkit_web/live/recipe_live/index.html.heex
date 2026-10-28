@@ -1,0 +1,58 @@
+<Layouts.app flash={@flash}>
+  <.header>
+    Recipes
+    <:subtitle>Ordered transform chains that can be applied to any payload.</:subtitle>
+    <:actions>
+      <.button variant="primary" navigate={~p"/recipes/new"}>New recipe</.button>
+    </:actions>
+  </.header>
+
+  <div :if={@recipes == []} class="card bg-base-100 shadow-sm">
+    <div class="card-body items-center text-center">
+      <p class="text-base-content/70">No recipes yet.</p>
+      <.button navigate={~p"/recipes/new"}>Create the first recipe</.button>
+    </div>
+  </div>
+
+  <.table :if={@recipes != []} id="recipes" rows={@recipes}>
+    <:col :let={recipe} label="Name">
+      <div class="font-medium">{recipe.name}</div>
+      <div :if={recipe.description} class="text-xs text-base-content/60">
+        {recipe.description}
+      </div>
+    </:col>
+    <:col :let={recipe} label="Chain">
+      <div class="flex flex-wrap gap-1">
+        <span
+          :for={label <- @chains[recipe.id]}
+          class={[
+            "badge badge-sm",
+            label.known && "badge-outline",
+            !label.known && "badge-warning"
+          ]}
+        >
+          {label.label}
+        </span>
+        <span :if={@chains[recipe.id] == []} class="text-base-content/50">—</span>
+      </div>
+    </:col>
+    <:col :let={recipe} label="Steps">{length(recipe.steps)}</:col>
+    <:action :let={recipe}>
+      <.link navigate={~p"/generate?recipe_id=#{recipe.id}"} class="btn btn-ghost btn-xs">
+        Generate
+      </.link>
+      <.link navigate={~p"/recipes/#{recipe.id}/edit"} class="btn btn-ghost btn-xs">
+        Edit
+      </.link>
+      <button
+        type="button"
+        class="btn btn-ghost btn-xs text-error"
+        phx-click="delete"
+        phx-value-id={recipe.id}
+        data-confirm="Delete this recipe?"
+      >
+        Delete
+      </button>
+    </:action>
+  </.table>
+</Layouts.app>

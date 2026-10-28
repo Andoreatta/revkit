@@ -1,0 +1,94 @@
+<Layouts.app flash={@flash}>
+  <.header>
+    Generate payload
+    <:subtitle>Preview a payload template through a saved transform recipe.</:subtitle>
+  </.header>
+
+  <div class="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+    <div class="space-y-6">
+      <div class="card bg-base-100 shadow-sm">
+        <div class="card-body">
+          <h2 class="card-title">Input</h2>
+
+          <form id="generate-form" phx-change="preview" phx-debounce="200" class="space-y-4">
+            <.input
+              type="textarea"
+              id="generate-template"
+              name="template"
+              value={@template}
+              rows="8"
+              label="Payload template"
+              class="w-full textarea font-mono text-sm"
+            />
+
+            <.input
+              type="select"
+              id="generate-recipe"
+              name="recipe_id"
+              value={@recipe_id}
+              label="Recipe"
+              prompt="No recipe (identity)"
+              options={Enum.map(@recipes, &{&1.name, &1.id})}
+            />
+
+            <p class="text-xs text-base-content/60">
+              Edit the template freely. Selecting a saved payload on the left replaces it.
+            </p>
+          </form>
+        </div>
+      </div>
+
+      <div class="card bg-base-100 shadow-sm">
+        <div class="card-body">
+          <div class="flex items-center justify-between">
+            <h2 class="card-title">Saved payloads</h2>
+            <.link navigate={~p"/payloads/new"} class="btn btn-ghost btn-xs">New</.link>
+          </div>
+
+          <p :if={@payloads == []} class="text-sm text-base-content/60">
+            No saved payloads yet.
+          </p>
+
+          <ul :if={@payloads != []} class="menu w-full">
+            <li :for={payload <- @payloads}>
+              <.link navigate={~p"/generate?payload_id=#{payload.id}"}>
+                <span class="font-medium">{payload.name}</span>
+                <span :if={payload.recipe} class="badge badge-outline badge-sm">
+                  {payload.recipe.name}
+                </span>
+              </.link>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-sm">
+      <div class="card-body">
+        <div class="flex items-center justify-between">
+          <h2 class="card-title">Preview</h2>
+          <span :if={@preview.recipe} class="badge badge-ghost">
+            {@preview.recipe.name}
+          </span>
+        </div>
+
+        <div :if={@preview.steps != []} class="flex flex-wrap gap-2">
+          <span :for={{module, _options} <- @preview.steps} class="badge badge-outline">
+            {module.label()}
+          </span>
+        </div>
+
+        <div :if={@preview.error} class="alert alert-error" role="alert">
+          <.icon name="hero-exclamation-circle" class="size-5 shrink-0" />
+          <span>{@preview.error}</span>
+        </div>
+
+        <pre
+          :if={@preview.status == :ok}
+          id="generate-preview"
+          class="max-h-[28rem] overflow-auto whitespace-pre-wrap break-all rounded-box bg-base-200 p-4 font-mono text-sm"
+        >{@preview.output}</pre>
+      </div>
+    </div>
+  </div>
+</Layouts.app>

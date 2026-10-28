@@ -1,0 +1,60 @@
+<Layouts.app flash={@flash}>
+  <.header>
+    {if @live_action == :new, do: "New payload", else: "Edit payload"}
+    <:subtitle>Store a template and the recipe used to transform it.</:subtitle>
+    <:actions>
+      <.button navigate={~p"/payloads"}>Back</.button>
+    </:actions>
+  </.header>
+
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body">
+      <.form
+        for={@form}
+        id="payload-form"
+        phx-change="validate"
+        phx-submit="save"
+        class="space-y-4"
+      >
+        <.input field={@form[:name]} type="text" label="Name" />
+        <.input field={@form[:description]} type="text" label="Description" />
+
+        <.input
+          field={@form[:template]}
+          type="textarea"
+          rows="8"
+          label="Template"
+          class="w-full textarea font-mono text-sm"
+        />
+
+        <.input
+          field={@form[:recipe_id]}
+          type="select"
+          label="Recipe"
+          prompt="No recipe"
+          options={Enum.map(@recipes, &{&1.name, &1.id})}
+        />
+
+        <div class="fieldset mb-2">
+          <label for="payload-tags" class="label mb-1">Tags</label>
+          <input
+            id="payload-tags"
+            type="text"
+            name="payload[tags]"
+            value={@tag_names}
+            placeholder="unix, linux"
+            class="w-full input"
+          />
+          <p class="mt-1 text-xs text-base-content/60">
+            Comma-separated. Missing tags are created on save.
+          </p>
+        </div>
+
+        <div class="flex gap-2">
+          <button type="submit" class="btn btn-primary">Save payload</button>
+          <.button navigate={~p"/payloads"}>Cancel</.button>
+        </div>
+      </.form>
+    </div>
+  </div>
+</Layouts.app>
