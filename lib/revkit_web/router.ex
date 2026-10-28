@@ -25,10 +25,12 @@ defmodule RevkitWeb.Router do
     live "/payloads", PayloadLive.Index, :index
     live "/payloads/new", PayloadLive.Form, :new
     live "/payloads/:id/edit", PayloadLive.Form, :edit
+    live "/payloads/:id", PayloadLive.Show, :show
 
     live "/recipes", RecipeLive.Index, :index
     live "/recipes/new", RecipeLive.Form, :new
     live "/recipes/:id/edit", RecipeLive.Form, :edit
+    live "/recipes/:id", RecipeLive.Show, :show
 
     live "/tags", TagLive.Index, :index
   end

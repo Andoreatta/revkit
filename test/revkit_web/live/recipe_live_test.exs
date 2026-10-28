@@ -144,6 +144,26 @@ defmodule RevkitWeb.RecipeLiveTest do
     assert Catalog.list_recipes() == []
   end
 
+  test "shows a saved snapshot with variables and context", %{conn: conn} do
+    {:ok, recipe} =
+      Catalog.create_recipe(%{
+        name: "Shown recipe",
+        template: "id {{HOST}}",
+        variables: %{"HOST" => "10.0.0.1"},
+        steps: [%{"key" => "base64_encode", "options" => %{}}],
+        notes: "Authorized testing only",
+        target_shell: "bash"
+      })
+
+    {:ok, _view, html} = live(conn, ~p"/recipes/#{recipe.id}")
+
+    assert html =~ "Shown recipe"
+    assert html =~ "id {{HOST}}"
+    assert html =~ "10.0.0.1"
+    assert html =~ "Authorized testing only"
+    assert html =~ "Base64 encode"
+  end
+
   test "searches recipes", %{conn: conn} do
     {:ok, _recipe} = Catalog.create_recipe(%{name: "Linux shell", template: "bash -i"})
     {:ok, _recipe} = Catalog.create_recipe(%{name: "Other", template: "cmd.exe"})

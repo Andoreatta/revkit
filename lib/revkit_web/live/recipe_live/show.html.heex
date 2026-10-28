@@ -1,0 +1,115 @@
+<Layouts.app flash={@flash} current={:recipes}>
+  <.header>
+    <span class="break-words">{@recipe.name}</span>
+    <:subtitle>{@recipe.description || "Saved generation snapshot."}</:subtitle>
+    <:actions>
+      <.link navigate={~p"/generate?recipe_id=#{@recipe.id}"} class="btn btn-primary btn-sm">
+        Open in generator
+      </.link>
+    </:actions>
+  </.header>
+
+  <div class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+    <div class="space-y-6">
+      <section class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body gap-4">
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="card-title">Snapshot</h2>
+            <UI.favorite_button favorite={@recipe.favorite} id={@recipe.id} />
+          </div>
+
+          <UI.code_block content={@recipe.template} />
+
+          <div :if={@variables != []}>
+            <p class="mb-2 text-xs font-medium text-base-content/60">Variables</p>
+            <dl class="grid gap-2 sm:grid-cols-2">
+              <div
+                :for={{name, value} <- @variables}
+                class="rounded-box border border-base-300 bg-base-200/50 px-3 py-2"
+              >
+                <dt class="font-mono text-xs text-base-content/50">{name}</dt>
+                <dd class="break-all font-mono text-sm">{value}</dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+      </section>
+
+      <section :if={@recipe.notes} class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body">
+          <h2 class="card-title">Context &amp; caveats</h2>
+          <p class="whitespace-pre-wrap text-sm leading-relaxed text-base-content/70">
+            {@recipe.notes}
+          </p>
+        </div>
+      </section>
+
+      <section class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body gap-3">
+          <h2 class="card-title">Transform chain</h2>
+          <p :if={@chain == []} class="text-sm text-base-content/60">
+            No transforms. The template passes through unchanged.
+          </p>
+          <div :if={@chain != []} class="flex flex-wrap gap-1">
+            <span
+              :for={label <- @chain}
+              class={[
+                "badge badge-sm",
+                label.known && "badge-outline",
+                !label.known && "badge-warning"
+              ]}
+            >
+              {label.label}
+            </span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="space-y-6">
+      <section class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body gap-4">
+          <h2 class="card-title">Target</h2>
+          <UI.target_badges
+            os={@recipe.target_os}
+            shell={@recipe.target_shell}
+            tools={@recipe.target_tools}
+          />
+          <div>
+            <p class="mb-2 text-xs font-medium text-base-content/60">Tags</p>
+            <UI.tag_badges tags={@recipe.tags} />
+          </div>
+          <p :if={@recipe.payload} class="text-xs text-base-content/50">
+            Source payload:
+            <.link navigate={~p"/payloads/#{@recipe.payload.id}"} class="link">
+              {@recipe.payload.name}
+            </.link>
+          </p>
+        </div>
+      </section>
+
+      <div class="flex flex-wrap gap-2">
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          phx-click="fork"
+          data-confirm="Fork this recipe?"
+        >
+          Fork
+        </button>
+        <.link navigate={~p"/recipes/#{@recipe.id}/edit"} class="btn btn-ghost btn-sm">
+          Edit
+        </.link>
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm text-error"
+          phx-click="delete"
+          data-confirm="Delete this recipe?"
+        >
+          Delete
+        </button>
+        <.link navigate={~p"/recipes"} class="btn btn-ghost btn-sm">Back to recipes</.link>
+      </div>
+    </div>
+  </div>
+</Layouts.app>

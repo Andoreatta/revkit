@@ -1,81 +1,138 @@
-<Layouts.app flash={@flash}>
+<Layouts.app flash={@flash} current={:payloads}>
   <.header>
     Payloads
-    <:subtitle>Saved payload templates, ready to preview through a recipe.</:subtitle>
+    <:subtitle>Curated templates with target context, tags, and reusable recipes.</:subtitle>
     <:actions>
       <.button variant="primary" navigate={~p"/payloads/new"}>New payload</.button>
     </:actions>
   </.header>
 
-  <form id="payload-search" phx-change="search" phx-debounce="250" class="mb-4">
-    <input
-      type="search"
-      name="q"
-      value={@query}
-      placeholder="Search payloads by name, description, or template"
-      class="w-full input"
-    />
+  <form
+    id="payload-search"
+    phx-change="search"
+    phx-debounce="250"
+    class="card mb-6 border border-base-300 bg-base-100 shadow-sm"
+  >
+    <div class="card-body gap-3 p-4 sm:flex-row sm:items-end">
+      <label class="form-control min-w-0 flex-1">
+        <span class="label-text mb-1 text-xs font-medium">Search</span>
+        <input
+          type="search"
+          name="q"
+          value={@query}
+          placeholder="Name, context, or template"
+          class="input input-sm w-full"
+        />
+      </label>
+
+      <label class="label cursor-pointer gap-2 self-center sm:self-end sm:pb-1.5">
+        <input
+          type="checkbox"
+          name="favorites"
+          value="true"
+          checked={@favorites_only}
+          class="checkbox checkbox-sm checkbox-primary"
+        />
+        <span class="label-text text-sm">Favorites</span>
+      </label>
+
+      <label class="form-control sm:w-48">
+        <span class="label-text mb-1 text-xs font-medium">Tag</span>
+        <select name="tag_id" class="select select-sm w-full">
+          <option value="">All tags</option>
+          <option
+            :for={tag <- @tags}
+            value={tag.id}
+            selected={tag.id == @tag_id}
+          >
+            {tag.name}
+          </option>
+        </select>
+      </label>
+    </div>
   </form>
 
-  <div :if={@payloads == []} class="card bg-base-100 shadow-sm">
-    <div class="card-body items-center text-center">
-      <p class="text-base-content/70">
-        {if @query == "", do: "No payloads yet.", else: "No payloads match your search."}
-      </p>
-      <.button :if={@query == ""} navigate={~p"/payloads/new"}>Create the first payload</.button>
-    </div>
-  </div>
+  <p class="mb-3 text-xs text-base-content/50">
+    {length(@payloads)} {if length(@payloads) == 1, do: "payload", else: "payloads"}
+  </p>
 
-  <.table :if={@payloads != []} id="payloads" rows={@payloads}>
-    <:col :let={payload} label="Name">
-      <div class="font-medium">{payload.name}</div>
-      <div :if={payload.description} class="text-xs text-base-content/60">
-        {payload.description}
-      </div>
-    </:col>
-    <:col :let={payload} label="Target">
-      {[payload.target_os, payload.target_shell] |> Enum.reject(&is_nil/1) |> Enum.join(" / ")}
-      <span :if={payload.target_tools != []} class="text-xs text-base-content/60">
-        · {Enum.join(payload.target_tools, ", ")}
-      </span>
-    </:col>
-    <:col :let={payload} label="Recipe">
-      {if payload.recipe, do: payload.recipe.name, else: "—"}
-    </:col>
-    <:col :let={payload} label="Tags">
-      <div class="flex flex-wrap gap-1">
-        <span :for={tag <- payload.tags} class="badge badge-ghost badge-sm">{tag.name}</span>
-        <span :if={payload.tags == []} class="text-base-content/50">—</span>
-      </div>
-    </:col>
-    <:action :let={payload}>
-      <button
-        type="button"
-        class="btn btn-ghost btn-xs"
-        phx-click="toggle_favorite"
-        phx-value-id={payload.id}
-        aria-label={if payload.favorite, do: "Unfavorite", else: "Favorite"}
-      >
-        <.icon
-          name={if payload.favorite, do: "hero-star-solid", else: "hero-star"}
-          class="size-4"
+  <UI.empty_state
+    :if={@payloads == []}
+    icon="hero-document-magnifying-glass"
+    title={if @query == "", do: "No payloads yet", else: "No matching payloads"}
+  >
+    <:body>
+      {if @query == "",
+        do: "Create a template to start composing and validating payloads.",
+        else: "Try a different search, tag, or clear the filters."}
+    </:body>
+    <:actions>
+      <.button :if={@query == ""} variant="primary" navigate={~p"/payloads/new"}>
+        Create payload
+      </.button>
+    </:actions>
+  </UI.empty_state>
+
+  <div :if={@payloads != []} class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <article
+      :for={payload <- @payloads}
+      id={"payload-card-#{payload.id}"}
+      class="card border border-base-300 bg-base-100 shadow-sm"
+    >
+      <div class="card-body gap-3 p-5">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <h2 class="card-title text-base">
+              <.link navigate={~p"/payloads/#{payload.id}"} class="link-hover">
+                {payload.name}
+              </.link>
+            </h2>
+            <p :if={payload.description} class="mt-1 text-sm text-base-content/60">
+              {payload.description}
+            </p>
+          </div>
+          <UI.favorite_button favorite={payload.favorite} id={payload.id} />
+        </div>
+
+        <UI.target_badges
+          os={payload.target_os}
+          shell={payload.target_shell}
+          tools={payload.target_tools}
         />
-      </button>
-      <.link navigate={~p"/generate?payload_id=#{payload.id}"} class="btn btn-ghost btn-xs">
-        Generate
-      </.link>
-      <.link navigate={~p"/payloads/#{payload.id}/edit"} class="btn btn-ghost btn-xs">
-        Edit
-      </.link>
-      <button
-        type="button"
-        class="btn btn-ghost btn-xs text-error"
-        phx-click="delete"
-        phx-value-id={payload.id}
-        data-confirm="Delete this payload?"
-      >
-        Delete
-      </button>
-    </:action>
-  </.table>
+
+        <UI.tag_badges tags={payload.tags} />
+
+        <p class="text-xs text-base-content/50">
+          Default recipe:
+          <span class="font-medium text-base-content/70">
+            {if payload.recipe, do: payload.recipe.name, else: "none"}
+          </span>
+        </p>
+
+        <div class="mt-auto flex flex-wrap items-center gap-1 border-t border-base-200 pt-3">
+          <.link
+            navigate={~p"/generate?payload_id=#{payload.id}"}
+            class="btn btn-primary btn-sm"
+          >
+            Generate
+          </.link>
+          <.link navigate={~p"/payloads/#{payload.id}"} class="btn btn-ghost btn-sm">
+            View
+          </.link>
+          <.link navigate={~p"/payloads/#{payload.id}/edit"} class="btn btn-ghost btn-sm">
+            Edit
+          </.link>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm ml-auto text-error"
+            phx-click="delete"
+            phx-value-id={payload.id}
+            data-confirm="Delete this payload?"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </article>
+  </div>
 </Layouts.app>

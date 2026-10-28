@@ -138,6 +138,49 @@ defmodule RevkitWeb.PayloadLiveTest do
     assert payload.favorite == true
   end
 
+  test "shows payload context and template", %{conn: conn} do
+    {:ok, payload} =
+      Catalog.create_payload_with_tags(
+        %{
+          name: "Shown payload",
+          description: "Use with an outbound listener",
+          template: "id {{HOST}}",
+          notes: "Authorized testing only",
+          target_shell: "bash"
+        },
+        ["linux"]
+      )
+
+    {:ok, _view, html} = live(conn, ~p"/payloads/#{payload.id}")
+
+    assert html =~ "Shown payload"
+    assert html =~ "Use with an outbound listener"
+    assert html =~ "id {{HOST}}"
+    assert html =~ "Authorized testing only"
+    assert html =~ "linux"
+  end
+
+  test "search filters by favorites and tag", %{conn: conn} do
+    {:ok, _payload} =
+      Catalog.create_payload_with_tags(
+        %{name: "Favorite Linux", template: "id", favorite: true},
+        ["linux"]
+      )
+
+    {:ok, _payload} = Catalog.create_payload_with_tags(%{name: "Other", template: "id"}, ["web"])
+
+    {:ok, view, _html} = live(conn, ~p"/payloads")
+    [linux] = Enum.filter(Catalog.list_tags(), &(&1.name == "linux"))
+
+    html = render_change(view, "search", %{"q" => "", "favorites" => "true"})
+    assert html =~ "Favorite Linux"
+    refute html =~ "Other"
+
+    html = render_change(view, "search", %{"q" => "", "tag_id" => to_string(linux.id)})
+    assert html =~ "Favorite Linux"
+    refute html =~ "Other"
+  end
+
   test "links to the generator with the payload id", %{conn: conn} do
     {:ok, payload} = Catalog.create_payload(%{name: "Payload", template: "id"})
 
