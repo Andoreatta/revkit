@@ -35,25 +35,29 @@ defmodule Revkit.Engine.Validator do
         module
         |> apply(callback, [])
         |> List.wrap()
-        |> Enum.reduce(acc, fn entry, {order, sources} ->
-          if Map.has_key?(sources, entry) do
-            {order, Map.update!(sources, entry, &[module | &1])}
-          else
-            {[entry | order], Map.put(sources, entry, [module])}
-          end
-        end)
+        |> Enum.reduce(acc, &add_entry(&1, module, &2))
       end)
 
     order
     |> Enum.reverse()
-    |> Enum.map(fn entry ->
-      transforms =
-        sources
-        |> Map.fetch!(entry)
-        |> Enum.reverse()
-        |> Enum.uniq()
+    |> Enum.map(&to_entry(&1, sources, key))
+  end
 
-      %{key => entry, transforms: transforms}
-    end)
+  defp add_entry(entry, module, {order, sources}) do
+    if Map.has_key?(sources, entry) do
+      {order, Map.update!(sources, entry, &[module | &1])}
+    else
+      {[entry | order], Map.put(sources, entry, [module])}
+    end
+  end
+
+  defp to_entry(entry, sources, key) do
+    transforms =
+      sources
+      |> Map.fetch!(entry)
+      |> Enum.reverse()
+      |> Enum.uniq()
+
+    %{key => entry, transforms: transforms}
   end
 end
