@@ -88,6 +88,72 @@ defmodule RevkitWeb.GenerateLiveTest do
     assert html =~ "Saved"
   end
 
+  test "shows the recipe requirements and pitfalls", %{conn: conn} do
+    {:ok, recipe} =
+      Catalog.create_recipe(%{
+        name: "Wrapped",
+        steps: [%{"key" => "bash_wrapper", "options" => %{}}]
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/generate")
+
+    html =
+      render_change(view, "preview", %{
+        "template" => "id",
+        "recipe_id" => to_string(recipe.id)
+      })
+
+    assert html =~ "Target requires"
+    assert html =~ "bash"
+    assert html =~ "Warnings"
+    assert html =~ "The payload runs with the privileges"
+  end
+
+  test "renders the copy hook with the current preview value", %{conn: conn} do
+    {:ok, recipe} =
+      Catalog.create_recipe(%{
+        name: "Encode",
+        steps: [%{"key" => "base64_encode", "options" => %{}}]
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/generate")
+
+    html =
+      render_change(view, "preview", %{
+        "template" => "hello",
+        "recipe_id" => to_string(recipe.id)
+      })
+
+    assert html =~ ~s(phx-hook="RevkitWeb.GenerateLive.CopyToClipboard")
+    assert html =~ ~s(id="generate-copy")
+    assert html =~ ~s(data-copy-value="aGVsbG8=")
+
+    html =
+      render_change(view, "preview", %{
+        "template" => "world",
+        "recipe_id" => to_string(recipe.id)
+      })
+
+    assert html =~ ~s(data-copy-value="d29ybGQ=")
+  end
+
+  test "hides the copy button when the preview fails", %{conn: conn} do
+    {:ok, recipe} =
+      Catalog.create_recipe(%{
+        name: "Broken",
+        steps: [%{"key" => "does_not_exist", "options" => %{}}]
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/generate")
+
+    render_change(view, "preview", %{
+      "template" => "hello",
+      "recipe_id" => to_string(recipe.id)
+    })
+
+    refute has_element?(view, "#generate-copy")
+  end
+
   test "shows an error for a recipe with an unknown transform", %{conn: conn} do
     {:ok, recipe} =
       Catalog.create_recipe(%{

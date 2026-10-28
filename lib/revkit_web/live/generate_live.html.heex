@@ -67,15 +67,55 @@
       <div class="card-body">
         <div class="flex items-center justify-between">
           <h2 class="card-title">Preview</h2>
-          <span :if={@preview.recipe} class="badge badge-ghost">
-            {@preview.recipe.name}
-          </span>
+          <div class="flex items-center gap-2">
+            <button
+              :if={@preview.status == :ok and @preview.output != nil and @preview.output != ""}
+              type="button"
+              id="generate-copy"
+              phx-hook=".CopyToClipboard"
+              data-copy-value={@preview.output}
+              class="btn btn-ghost btn-xs"
+              aria-label="Copy preview to clipboard"
+            >
+              <.icon name="hero-clipboard" class="size-4" />
+              <span data-copy-label>Copy</span>
+            </button>
+            <span id="generate-copy-status" class="sr-only" aria-live="polite"></span>
+            <span :if={@preview.recipe} class="badge badge-ghost">
+              {@preview.recipe.name}
+            </span>
+          </div>
         </div>
 
         <div :if={@preview.steps != []} class="flex flex-wrap gap-2">
           <span :for={{module, _options} <- @preview.steps} class="badge badge-outline">
             {module.label()}
           </span>
+        </div>
+
+        <div :if={@preview.validation.requires != []} class="flex flex-wrap items-center gap-2">
+          <span class="text-xs font-medium text-base-content/60">Target requires:</span>
+          <span
+            :for={requirement <- @preview.validation.requires}
+            class="badge badge-warning badge-sm"
+          >
+            {requirement.name}
+          </span>
+        </div>
+
+        <div :if={@preview.validation.pitfalls != []} class="alert alert-warning">
+          <.icon name="hero-exclamation-triangle" class="size-5 shrink-0" />
+          <div>
+            <p class="font-semibold">Warnings</p>
+            <ul class="list-inside list-disc text-sm">
+              <li :for={pitfall <- @preview.validation.pitfalls}>
+                {pitfall.message}
+                <span class="text-xs text-base-content/60">
+                  ({Enum.map_join(pitfall.transforms, ", ", & &1.label())})
+                </span>
+              </li>
+            </ul>
+          </div>
         </div>
 
         <div :if={@preview.error} class="alert alert-error" role="alert">
@@ -92,3 +132,61 @@
     </div>
   </div>
 </Layouts.app>
+
+<script :type={Phoenix.LiveView.ColocatedHook} name=".CopyToClipboard">
+  export default {
+    mounted() {
+      this.onClick = () => this.copy()
+      this.el.addEventListener("click", this.onClick)
+    },
+
+    destroyed() {
+      this.el.removeEventListener("click", this.onClick)
+      clearTimeout(this.feedbackTimer)
+    },
+
+    copy() {
+      const value = this.el.dataset.copyValue ?? ""
+
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(value).then(
+          () => this.feedback("Copied"),
+          () => this.fallback(value)
+        )
+      } else {
+        this.fallback(value)
+      }
+    },
+
+    fallback(value) {
+      const textarea = document.createElement("textarea")
+      textarea.value = value
+      textarea.setAttribute("readonly", "")
+      textarea.style.position = "fixed"
+      textarea.style.opacity = "0"
+      document.body.appendChild(textarea)
+      textarea.select()
+
+      try {
+        document.execCommand("copy") ? this.feedback("Copied") : this.feedback("Copy failed")
+      } catch (_error) {
+        this.feedback("Copy failed")
+      } finally {
+        textarea.remove()
+      }
+    },
+
+    feedback(label) {
+      const target = this.el.querySelector("[data-copy-label]")
+      const status = document.getElementById("generate-copy-status")
+
+      if (target) target.textContent = label
+      if (status) status.textContent = label
+
+      clearTimeout(this.feedbackTimer)
+      this.feedbackTimer = setTimeout(() => {
+        if (target) target.textContent = "Copy"
+      }, 1500)
+    }
+  }
+</script>

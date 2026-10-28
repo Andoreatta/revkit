@@ -4,6 +4,7 @@ defmodule RevkitWeb.GenerateLive do
   alias Revkit.Catalog
   alias Revkit.Engine.Chain
   alias Revkit.Engine.Transforms
+  alias Revkit.Engine.Validator
 
   @impl true
   def mount(_params, _session, socket) do
@@ -73,14 +74,30 @@ defmodule RevkitWeb.GenerateLive do
         run_chain(template || "", chain, recipe)
 
       {:error, reason} ->
-        %{status: :error, output: nil, error: format_error(reason), recipe: recipe, steps: []}
+        %{
+          status: :error,
+          output: nil,
+          error: format_error(reason),
+          recipe: recipe,
+          steps: [],
+          validation: %{requires: [], pitfalls: []}
+        }
     end
   end
 
   defp run_chain(template, chain, recipe) do
+    validation = Validator.validate(chain)
+
     case Chain.run(template, chain) do
       {:ok, output} ->
-        %{status: :ok, output: output, error: nil, recipe: recipe, steps: chain}
+        %{
+          status: :ok,
+          output: output,
+          error: nil,
+          recipe: recipe,
+          steps: chain,
+          validation: validation
+        }
 
       {:error, reason} ->
         %{
@@ -88,7 +105,8 @@ defmodule RevkitWeb.GenerateLive do
           output: nil,
           error: format_error(reason),
           recipe: recipe,
-          steps: chain
+          steps: chain,
+          validation: validation
         }
     end
   end

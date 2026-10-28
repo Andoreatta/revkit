@@ -37,8 +37,8 @@ as ad-hoc commands.
 
 - `lib/revkit/` — domain and OTP: `Revkit.Repo`, `Revkit.Application`.
   - `lib/revkit/engine/` — pure payload engine: `Chain`, the `Transforms`
-    registry, and `Transforms.*` are implemented; `Template` and `Validator`
-    are planned. **← NOVO**
+    registry, `Transforms.*`, and `Validator` are implemented; `Template` is
+    planned. **← NOVO**
   - `lib/revkit/catalog/` — Ecto schemas (`Payload`, `Recipe`, `Tag`) and the
     `Revkit.Catalog` context. Recipes keep their ordered transform steps as
     JSON (`%{"key" => "base64_encode", "options" => %{}}`) so a recipe references
@@ -84,6 +84,9 @@ the design collapses.
   adding a transform is adding code — never a row in a table.
 - **Chain application is `Enum.reduce_while/3`.** On the first `{:error, _}`,
   halt and return it. Do not rescue silently.
+- **`Validator` reads metadata only.** It aggregates `requires/0` and
+  `pitfalls/0` from the resolved chain; those strings are advisory because the
+  engine has no target profile. Never execute or probe the target to validate.
 - **Offensive-security scope:** the system *generates* and *validates* strings.
   It must never execute, spawn, `System.cmd/3`, or shell out to any payload.
   If a feature would execute a command, it is out of scope.
@@ -109,7 +112,10 @@ the design collapses.
   add `phx-update="ignore"` when the hook owns its DOM.
   - **The "Copy to clipboard" button uses a colocated hook** (e.g.
     `.CopyToClipboard`), reading the value from a `data-*` attribute bound to
-    the preview. Do not add a vendored JS file for this. **← NOVO**
+    the preview. Do not add a vendored JS file for this. It does **not** use
+    `phx-update="ignore"`: the hook reads `data-copy-value`, which must keep
+    updating with the preview. Only ignore updates when the hook owns its DOM.
+    **← NOVO**
   - **No CodeMirror/Monaco.** The template field is a plain `<textarea>` with
     monospace classes; a syntax-highlighting editor would require vendoring or
     Node tooling, which is out of scope. **← NOVO**
