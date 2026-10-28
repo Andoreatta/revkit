@@ -22,16 +22,20 @@ mix phx.server   # http://localhost:4000 (Bandit); or: iex -S mix phx.server
 mix test         # alias: ecto.create --quiet, ecto.migrate --quiet, test
 mix test test/revkit_web/controllers/page_controller_test.exs
 mix test test/path_test.exs:42
-mix precommit    # compile --warnings-as-errors, deps.unlock --unused, format, test
+mix precommit    # compile --warnings-as-errors, deps.unlock --unused, format, credo, sobelow --skip, test, dialyzer
+mix credo        # strict rules from .credo.exs
+mix sobelow --skip # honors annotated # sobelow_skip findings
+mix dialyzer     # type analysis; PLTs live in priv/plts (ignored)
 mix ecto.reset   # drop, recreate, migrate, seed
 mix assets.build # compile + tailwind + esbuild
 mix assets.deploy # minified assets + phx.digest (production)
 ```
 
 `mix precommit` is the gate: compile warnings fail it, and it runs `format`
-(writes files), not a check-only format. Run it before considering any task
-done. If `credo`/`dialyxir` are added later, they go into `mix precommit`, not
-as ad-hoc commands.
+(writes files), not a check-only format. It also runs strict Credo, Sobelow,
+the test suite, and Dialyzer. Run it before considering any task done. The first
+`mix dialyzer` run builds PLTs in `priv/plts/`; they are gitignored. Do not
+reintroduce ad-hoc lint/type/security commands outside the precommit alias.
 
 ## Structure
 
@@ -50,6 +54,9 @@ as ad-hoc commands.
   exists only when `:dev_routes` is true (set in `config/dev.exs`). The
   LiveDashboard is a **dev-only observability tool**, not a domain feature — do
   not surface it in the product, do not remove it from `dev`. **← NOVO**
+- `lib/revkit_web/plugs/content_security_policy.ex` — nonce-based CSP for the
+  browser pipeline. Inline scripts must use `nonce={@csp_nonce}`; the
+  LiveDashboard is configured with `csp_nonce_assign_key: :csp_nonce`.
 - `RevkitWeb.CoreComponents` — `flash`, `button`, `input`, `table`, `list`,
   `header`, `icon`. `RevkitWeb.Layouts` — `app/1`, `flash_group/1`,
   `theme_toggle/1`, plus `layouts/root.html.heex`.
@@ -97,6 +104,14 @@ the design collapses.
   `alert`, `table`, `fieldset`, `input`, `select`, `checkbox`, `textarea`). Match
   that style instead of hand-rolling equivalents. The `light` (default) and
   `dark` themes are defined in `assets/css/app.css`.
+- Quality gates: Credo runs strict from `.credo.exs`; do not disable checks
+  without a comment explaining why. Sobelow runs with `--skip`, so only
+  annotated `# sobelow_skip` findings are suppressed. Dialyzer must stay at
+  zero errors.
+- The `# sobelow_skip ["Config.CSP"]` on the `:browser` pipeline is intentional:
+  Sobelow only recognizes `put_secure_browser_headers/2`, while the real header
+  comes from `RevkitWeb.Plugs.ContentSecurityPolicy`. Keep `--skip` in the
+  precommit alias or Sobelow will report a false positive.
 - Tailwind v4 has no `tailwind.config.js`. Keep the
   `@import "tailwindcss" source(none)` block and all `@source` lines in
   `assets/css/app.css`, including the `_build/dev/phoenix-colocated/revkit/*/`
