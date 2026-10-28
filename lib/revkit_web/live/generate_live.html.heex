@@ -1,7 +1,7 @@
 <Layouts.app flash={@flash}>
   <.header>
     Generate payload
-    <:subtitle>Preview a payload template through a saved transform recipe.</:subtitle>
+    <:subtitle>Compose a template, variables, and an ordered transform chain.</:subtitle>
   </.header>
 
   <div class="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
@@ -12,6 +12,26 @@
 
           <form id="generate-form" phx-change="preview" phx-debounce="200" class="space-y-4">
             <.input
+              type="select"
+              id="generate-payload"
+              name="payload_id"
+              value={@payload_id}
+              label="Saved payload"
+              prompt="Custom template"
+              options={Enum.map(@payloads, &{&1.name, &1.id})}
+            />
+
+            <.input
+              type="select"
+              id="generate-recipe"
+              name="recipe_id"
+              value={@recipe_id}
+              label="Saved recipe"
+              prompt="No recipe"
+              options={Enum.map(@recipes, &{&1.name, &1.id})}
+            />
+
+            <.input
               type="textarea"
               id="generate-template"
               name="template"
@@ -21,55 +41,199 @@
               class="w-full textarea font-mono text-sm"
             />
 
-            <.input
-              type="select"
-              id="generate-recipe"
-              name="recipe_id"
-              value={@recipe_id}
-              label="Recipe"
-              prompt="No recipe (identity)"
-              options={Enum.map(@recipes, &{&1.name, &1.id})}
-            />
+            <div :if={@variable_names != []} class="space-y-2">
+              <h3 class="text-sm font-semibold">Variables</h3>
+              <div class="grid gap-2 sm:grid-cols-2">
+                <.input
+                  :for={name <- @variable_names}
+                  type="text"
+                  id={"generate-variable-" <> name}
+                  name={"variables[#{name}]"}
+                  value={@variables[name]}
+                  label={name}
+                />
+              </div>
+            </div>
 
-            <p class="text-xs text-base-content/60">
-              Edit the template freely. Selecting a saved payload on the left replaces it.
-            </p>
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <h3 class="text-sm font-semibold">Transform chain</h3>
+                <button
+                  type="button"
+                  id="generate-add-step"
+                  class="btn btn-ghost btn-sm"
+                  phx-click="add_step"
+                >
+                  <.icon name="hero-plus" class="size-4" /> Add transform
+                </button>
+              </div>
+
+              <p :if={@steps == []} class="text-sm text-base-content/60">
+                No transforms yet. The payload passes through unchanged.
+              </p>
+
+              <div
+                :for={{step, index} <- Enum.with_index(@steps)}
+                id={"generate-step-#{index}"}
+                class="flex flex-col gap-2 rounded-box bg-base-200 p-3 sm:flex-row sm:items-center"
+              >
+                <select
+                  name={"steps[#{index}][key]"}
+                  class="w-full select select-sm sm:flex-1"
+                >
+                  <option value="">Select a transform</option>
+                  <option
+                    :if={step.key != "" and is_nil(Transforms.fetch(step.key))}
+                    value={step.key}
+                    selected
+                  >
+                    {step.key} (unknown)
+                  </option>
+                  <option
+                    :for={transform <- Transforms.all()}
+                    value={transform.key()}
+                    selected={step.key == Atom.to_string(transform.key())}
+                  >
+                    {transform.label()}
+                  </option>
+                </select>
+
+                <div class="flex gap-1">
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs"
+                    phx-click="move_step"
+                    phx-value-id={step.id}
+                    phx-value-direction="up"
+                    aria-label="Move up"
+                  >
+                    <.icon name="hero-arrow-up" class="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs"
+                    phx-click="move_step"
+                    phx-value-id={step.id}
+                    phx-value-direction="down"
+                    aria-label="Move down"
+                  >
+                    <.icon name="hero-arrow-down" class="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs text-error"
+                    phx-click="remove_step"
+                    phx-value-id={step.id}
+                    aria-label="Remove step"
+                  >
+                    <.icon name="hero-x-mark" class="size-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
           </form>
-        </div>
-      </div>
 
-      <div class="card bg-base-100 shadow-sm">
-        <div class="card-body">
-          <div class="flex items-center justify-between">
-            <h2 class="card-title">Saved payloads</h2>
-            <.link navigate={~p"/payloads/new"} class="btn btn-ghost btn-xs">New</.link>
+          <div class="mt-4 border-t border-base-300 pt-4">
+            <div class="flex items-center justify-between">
+              <h2 class="card-title">Saved payloads</h2>
+              <.link navigate={~p"/payloads/new"} class="btn btn-ghost btn-xs">New</.link>
+            </div>
+
+            <p :if={@payloads == []} class="text-sm text-base-content/60">
+              No saved payloads yet.
+            </p>
+
+            <ul :if={@payloads != []} class="menu w-full">
+              <li :for={payload <- @payloads}>
+                <.link navigate={~p"/generate?payload_id=#{payload.id}"}>
+                  <span class="font-medium">{payload.name}</span>
+                  <span :if={payload.recipe} class="badge badge-outline badge-sm">
+                    {payload.recipe.name}
+                  </span>
+                </.link>
+              </li>
+            </ul>
           </div>
-
-          <p :if={@payloads == []} class="text-sm text-base-content/60">
-            No saved payloads yet.
-          </p>
-
-          <ul :if={@payloads != []} class="menu w-full">
-            <li :for={payload <- @payloads}>
-              <.link navigate={~p"/generate?payload_id=#{payload.id}"}>
-                <span class="font-medium">{payload.name}</span>
-                <span :if={payload.recipe} class="badge badge-outline badge-sm">
-                  {payload.recipe.name}
-                </span>
-              </.link>
-            </li>
-          </ul>
         </div>
       </div>
     </div>
 
-    <div class="card bg-base-100 shadow-sm">
-      <div class="card-body">
-        <div class="flex items-center justify-between">
-          <h2 class="card-title">Preview</h2>
-          <div class="flex items-center gap-2">
+    <div class="space-y-6">
+      <div class="card bg-base-100 shadow-sm">
+        <div class="card-body">
+          <div class="flex items-center justify-between">
+            <h2 class="card-title">Preview</h2>
+            <span :if={@preview.recipe} class="badge badge-ghost">
+              {@preview.recipe.name}
+            </span>
+          </div>
+
+          <div :if={@preview.steps != []} class="flex flex-wrap gap-2">
+            <span :for={{module, _options} <- @preview.steps} class="badge badge-outline">
+              {module.label()}
+            </span>
+          </div>
+
+          <p
+            :if={@target[:os] || @target[:shell] || @target[:tools] not in [nil, []]}
+            class="text-xs text-base-content/60"
+          >
+            Target: {[@target[:os], @target[:shell]] |> Enum.reject(&is_nil/1) |> Enum.join(" / ")}
+            <span :if={@target[:tools] != []}>· tools: {Enum.join(@target[:tools], ", ")}</span>
+          </p>
+
+          <div :if={@preview.validation.requires != []} class="flex flex-wrap items-center gap-2">
+            <span class="text-xs font-medium text-base-content/60">Target requires:</span>
+            <span
+              :for={requirement <- @preview.validation.requires}
+              class="badge badge-warning badge-sm"
+            >
+              {requirement.name}
+            </span>
+          </div>
+
+          <div :if={@preview.validation.warnings != []} class="alert alert-error">
+            <.icon name="hero-exclamation-triangle" class="size-5 shrink-0" />
+            <div>
+              <p class="font-semibold">Compatibility warnings</p>
+              <ul class="list-inside list-disc text-sm">
+                <li :for={warning <- @preview.validation.warnings}>{warning.message}</li>
+              </ul>
+            </div>
+          </div>
+
+          <div :if={@preview.validation.pitfalls != []} class="alert alert-warning">
+            <.icon name="hero-exclamation-triangle" class="size-5 shrink-0" />
+            <div>
+              <p class="font-semibold">Warnings</p>
+              <ul class="list-inside list-disc text-sm">
+                <li :for={pitfall <- @preview.validation.pitfalls}>
+                  {pitfall.message}
+                  <span class="text-xs text-base-content/60">
+                    ({Enum.map_join(pitfall.transforms, ", ", & &1.label())})
+                  </span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div :if={@preview.error} class="alert alert-error" role="alert">
+            <.icon name="hero-exclamation-circle" class="size-5 shrink-0" />
+            <span>{@preview.error}</span>
+          </div>
+
+          <pre
+            :if={@preview.status == :ok}
+            id="generate-preview"
+            class="max-h-[28rem] overflow-auto whitespace-pre-wrap break-all rounded-box bg-base-200 p-4 font-mono text-sm"
+          >{@preview.output}</pre>
+
+          <div
+            :if={@preview.status == :ok and @preview.output not in [nil, ""]}
+            class="flex items-center justify-end gap-2"
+          >
+            <span id="generate-copy-status" class="sr-only" aria-live="polite"></span>
             <button
-              :if={@preview.status == :ok and @preview.output != nil and @preview.output != ""}
               type="button"
               id="generate-copy"
               phx-hook=".CopyToClipboard"
@@ -80,54 +244,35 @@
               <.icon name="hero-clipboard" class="size-4" />
               <span data-copy-label>Copy</span>
             </button>
-            <span id="generate-copy-status" class="sr-only" aria-live="polite"></span>
-            <span :if={@preview.recipe} class="badge badge-ghost">
-              {@preview.recipe.name}
-            </span>
           </div>
         </div>
+      </div>
 
-        <div :if={@preview.steps != []} class="flex flex-wrap gap-2">
-          <span :for={{module, _options} <- @preview.steps} class="badge badge-outline">
-            {module.label()}
-          </span>
-        </div>
+      <div class="card bg-base-100 shadow-sm">
+        <div class="card-body">
+          <h2 class="card-title">Save as recipe</h2>
 
-        <div :if={@preview.validation.requires != []} class="flex flex-wrap items-center gap-2">
-          <span class="text-xs font-medium text-base-content/60">Target requires:</span>
-          <span
-            :for={requirement <- @preview.validation.requires}
-            class="badge badge-warning badge-sm"
+          <.form
+            for={@save_form}
+            id="save-recipe-form"
+            phx-submit="save_recipe"
+            class="space-y-3"
           >
-            {requirement.name}
-          </span>
+            <.input field={@save_form[:name]} type="text" label="Name" />
+            <.input field={@save_form[:notes]} type="textarea" rows="3" label="Notes" />
+            <div class="fieldset mb-2">
+              <label for="generate-recipe-tags" class="label mb-1">Tags</label>
+              <input
+                id="generate-recipe-tags"
+                type="text"
+                name="recipe[tags]"
+                placeholder="unix, reverse-shell"
+                class="w-full input"
+              />
+            </div>
+            <button type="submit" class="btn btn-primary">Save recipe</button>
+          </.form>
         </div>
-
-        <div :if={@preview.validation.pitfalls != []} class="alert alert-warning">
-          <.icon name="hero-exclamation-triangle" class="size-5 shrink-0" />
-          <div>
-            <p class="font-semibold">Warnings</p>
-            <ul class="list-inside list-disc text-sm">
-              <li :for={pitfall <- @preview.validation.pitfalls}>
-                {pitfall.message}
-                <span class="text-xs text-base-content/60">
-                  ({Enum.map_join(pitfall.transforms, ", ", & &1.label())})
-                </span>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <div :if={@preview.error} class="alert alert-error" role="alert">
-          <.icon name="hero-exclamation-circle" class="size-5 shrink-0" />
-          <span>{@preview.error}</span>
-        </div>
-
-        <pre
-          :if={@preview.status == :ok}
-          id="generate-preview"
-          class="max-h-[28rem] overflow-auto whitespace-pre-wrap break-all rounded-box bg-base-200 p-4 font-mono text-sm"
-        >{@preview.output}</pre>
       </div>
     </div>
   </div>

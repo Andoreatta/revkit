@@ -16,7 +16,7 @@ defmodule RevkitWeb.GenerateLiveTest do
 
     assert html =~ "Generate payload"
     assert html =~ "Encode"
-    assert html =~ "No recipe (identity)"
+    assert html =~ "No recipe"
   end
 
   test "serves the CSP nonce for the inline theme script", %{conn: conn} do
@@ -160,6 +160,113 @@ defmodule RevkitWeb.GenerateLiveTest do
     })
 
     refute has_element?(view, "#generate-copy")
+  end
+
+  test "renders variables and reports missing values", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/generate")
+
+    html =
+      render_change(view, "preview", %{
+        "template" => "nc {{LHOST}} {{LPORT}}",
+        "variables" => %{"LHOST" => "10.0.0.1", "LPORT" => "4444"}
+      })
+
+    assert html =~ "nc 10.0.0.1 4444"
+    assert html =~ "LHOST"
+
+    html =
+      render_change(view, "preview", %{
+        "template" => "nc {{LHOST}} {{LPORT}}",
+        "variables" => %{"LHOST" => "10.0.0.1", "LPORT" => ""}
+      })
+
+    assert html =~ "Missing variables: LPORT"
+  end
+
+  test "warns about incompatible target metadata before the copy button", %{conn: conn} do
+    {:ok, recipe} =
+      Catalog.create_recipe(%{
+        name: "Bash",
+        steps: [%{"key" => "bash_wrapper", "options" => %{}}]
+      })
+
+    {:ok, payload} =
+      Catalog.create_payload(%{
+        name: "Linux sh",
+        template: "id",
+        target_os: "linux",
+        target_shell: "sh",
+        recipe_id: recipe.id
+      })
+
+    {:ok, _view, html} = live(conn, ~p"/generate?payload_id=#{payload.id}")
+
+    {warning_position, _} = :binary.match(html, "Compatibility warnings")
+    {copy_position, _} = :binary.match(html, ~s(id="generate-copy"))
+
+    assert warning_position < copy_position
+    assert html =~ "does not declare it"
+  end
+
+  test "adds a transform and previews the edited chain", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/generate")
+
+    view |> element("#generate-add-step") |> render_click()
+    assert has_element?(view, "#generate-step-0")
+
+    html =
+      render_change(view, "preview", %{
+        "template" => "hello",
+        "steps" => %{"0" => %{"key" => "base64_encode"}}
+      })
+
+    assert html =~ "aGVsbG8="
+  end
+
+  test "reopens a saved recipe snapshot", %{conn: conn} do
+    {:ok, recipe} =
+      Catalog.create_recipe(%{
+        name: "Snapshot",
+        template: "id {{HOST}}",
+        variables: %{"HOST" => "10.0.0.1"},
+        steps: [%{"key" => "base64_encode", "options" => %{}}],
+        notes: "note"
+      })
+
+    {:ok, _view, html} = live(conn, ~p"/generate?recipe_id=#{recipe.id}")
+
+    assert html =~ "aWQgMTAuMC4wLjE="
+    assert html =~ "Snapshot"
+  end
+
+  test "saves the full generation snapshot as a recipe", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/generate")
+
+    render_change(view, "preview", %{
+      "template" => "id {{HOST}}",
+      "variables" => %{"HOST" => "10.0.0.1"}
+    })
+
+    view |> element("#generate-add-step") |> render_click()
+
+    render_change(view, "preview", %{
+      "template" => "id {{HOST}}",
+      "variables" => %{"HOST" => "10.0.0.1"},
+      "steps" => %{"0" => %{"key" => "base64_encode"}}
+    })
+
+    render_submit(view, "save_recipe", %{
+      "recipe" => %{"name" => "Saved generation", "notes" => "note", "tags" => "unix"}
+    })
+
+    assert_redirect(view, ~p"/recipes")
+
+    assert [recipe] = Catalog.list_recipes()
+    assert recipe.template == "id {{HOST}}"
+    assert recipe.variables == %{"HOST" => "10.0.0.1"}
+    assert recipe.steps == [%{"key" => "base64_encode", "options" => %{}}]
+    assert recipe.notes == "note"
+    assert recipe.tags |> Enum.map(& &1.name) == ["unix"]
   end
 
   test "shows an error for a recipe with an unknown transform", %{conn: conn} do
