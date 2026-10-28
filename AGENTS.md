@@ -29,6 +29,8 @@ mix dialyzer     # type analysis; PLTs live in priv/plts (ignored)
 mix ecto.reset   # drop, recreate, migrate, seed
 mix assets.build # compile + tailwind + esbuild
 mix assets.deploy # minified assets + phx.digest (production)
+docker compose up --build # production image + SQLite volume
+docker compose down -v # stop and delete the SQLite volume
 ```
 
 `mix precommit` is the gate: compile warnings fail it, and it runs `format`
@@ -68,6 +70,10 @@ reintroduce ad-hoc lint/type/security commands outside the precommit alias.
   they own their form assigns.
 - New LiveViews belong in `lib/revkit_web/live/` as `RevkitWeb.XLive`; routes can
   use `live "/x", XLive` because the browser scope is aliased to `RevkitWeb`.
+- `Dockerfile`, `compose.yaml`, `.env.example`, and `docker/entrypoint.sh` — the
+  production image is a multi-stage Elixir release running as a non-root user.
+  `lib/revkit/release.ex` runs migrations inside the release; the entrypoint
+  migrates, then starts the server.
 
 ## Revkit Architecture (domain rules)
 
@@ -148,6 +154,13 @@ the design collapses.
   are `:utc_datetime`.
 - Production requires `DATABASE_PATH` and `SECRET_KEY_BASE`
   (`config/runtime.exs`); the SQLite file must live on persistent storage.
+- Docker/release: migrations run in the container entrypoint via
+  `Revkit.Release.migrate/0`; SQLite is single-writer, so run one container only.
+  Keep the app on a private interface and terminate TLS in a reverse proxy. The
+  app has **no auth and no JSON API**; protect a public deployment at the network
+  layer. `DATABASE_PATH` defaults to `/data/revkit.db`, backed by a volume.
+- Docker context must exclude `priv/plts`; otherwise Dialyzer PLTs can bloat the
+  release image.
 
 ## Workflow with the coding agent
 
