@@ -1,6 +1,6 @@
 # Revkit
 
-Phoenix 1.8 + LiveView 1.2 app (Elixir ~> 1.17) with a browser UI and JSON API.
+Phoenix 1.8 + LiveView 1.2 app (Elixir ~> 1.17) with a browser UI.
 Persistence is SQLite via `ecto_sqlite3`, not Postgres. Assets are Tailwind v4 +
 daisyUI + Heroicons, bundled by esbuild through Mix tasks; there is no
 `package.json` or Node toolchain.

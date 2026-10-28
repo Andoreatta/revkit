@@ -14,14 +14,11 @@ defmodule RevkitWeb.Router do
     plug RevkitWeb.Plugs.ContentSecurityPolicy
   end
 
-  pipeline :api do
-    plug :accepts, ["json"]
-  end
-
   scope "/", RevkitWeb do
     pipe_through :browser
 
     get "/", PageController, :home
+    get "/health", HealthController, :index
 
     live "/generate", GenerateLive, :index
 
@@ -33,11 +30,6 @@ defmodule RevkitWeb.Router do
     live "/recipes/new", RecipeLive.Form, :new
     live "/recipes/:id/edit", RecipeLive.Form, :edit
   end
-
-  # Other scopes may use custom stacks.
-  # scope "/api", RevkitWeb do
-  #   pipe_through :api
-  # end
 
   # Enable LiveDashboard in development
   if Application.compile_env(:revkit, :dev_routes) do
