@@ -3,6 +3,7 @@ defmodule RevkitWeb.TagLive.Index do
 
   alias Revkit.Catalog
   alias Revkit.Catalog.Tag
+  alias RevkitWeb.UI
 
   @impl true
   def mount(_params, _session, socket) do

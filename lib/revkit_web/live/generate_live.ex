@@ -8,6 +8,7 @@ defmodule RevkitWeb.GenerateLive do
   alias Revkit.Engine.Transforms
   alias Revkit.Engine.Validator
   alias RevkitWeb.StepEditor
+  alias RevkitWeb.UI
 
   @impl true
   def mount(_params, _session, socket) do

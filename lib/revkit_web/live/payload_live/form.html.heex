@@ -1,98 +1,128 @@
-<Layouts.app flash={@flash}>
+<Layouts.app flash={@flash} current={:payloads}>
   <.header>
     {if @live_action == :new, do: "New payload", else: "Edit payload"}
-    <:subtitle>Store a template and the recipe used to transform it.</:subtitle>
+    <:subtitle>Define the template, target assumptions, and context for reuse.</:subtitle>
     <:actions>
       <.button navigate={~p"/payloads"}>Back</.button>
     </:actions>
   </.header>
 
-  <div class="card bg-base-100 shadow-sm">
-    <div class="card-body">
-      <.form
-        for={@form}
-        id="payload-form"
-        phx-change="validate"
-        phx-submit="save"
-        class="space-y-4"
-      >
-        <.input field={@form[:name]} type="text" label="Name" />
-        <.input field={@form[:description]} type="text" label="Description" />
-        <.input field={@form[:favorite]} type="checkbox" label="Favorite" />
-
-        <div class="grid gap-2 sm:grid-cols-2">
+  <div class="mx-auto max-w-3xl">
+    <.form
+      for={@form}
+      id="payload-form"
+      phx-change="validate"
+      phx-submit="save"
+      class="space-y-5"
+    >
+      <section class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body gap-4">
+          <h2 class="card-title text-base">Basics</h2>
+          <.input field={@form[:name]} type="text" label="Name" />
           <.input
-            field={@form[:target_os]}
+            field={@form[:description]}
             type="text"
-            label="Target OS"
-            placeholder="linux, windows, macos"
+            label="When to use"
+            placeholder="e.g. Linux host with outbound TCP and bash available"
           />
-          <.input
-            field={@form[:target_shell]}
-            type="text"
-            label="Target shell"
-            placeholder="bash, sh, powershell"
-          />
+          <.input field={@form[:favorite]} type="checkbox" label="Favorite" />
         </div>
+      </section>
 
-        <div class="fieldset mb-2">
-          <label for="payload-target-tools" class="label mb-1">Target tools</label>
-          <input
-            id="payload-target-tools"
-            type="text"
-            name="payload[target_tools_text]"
-            value={@target_tools}
-            placeholder="base64, curl, nc"
-            class="w-full input"
+      <section class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body gap-4">
+          <h2 class="card-title text-base">Template</h2>
+          <.input
+            field={@form[:template]}
+            type="textarea"
+            rows="8"
+            label="Payload template"
+            class="w-full textarea font-mono text-sm"
           />
-          <p class="mt-1 text-xs text-base-content/60">
-            Comma-separated capabilities available on the target.
+          <p class="text-xs text-base-content/60">
+            Use <code class="rounded bg-base-200 px-1 font-mono">{"{{NAME}}"}</code>
+            placeholders for values such as LHOST, LPORT, or a filename.
           </p>
         </div>
+      </section>
 
-        <.input
-          field={@form[:template]}
-          type="textarea"
-          rows="8"
-          label="Template"
-          class="w-full textarea font-mono text-sm"
-        />
+      <section class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body gap-4">
+          <h2 class="card-title text-base">Target assumptions</h2>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <.input
+              field={@form[:target_os]}
+              type="text"
+              label="Target OS"
+              placeholder="linux, windows, macos"
+            />
+            <.input
+              field={@form[:target_shell]}
+              type="text"
+              label="Target shell"
+              placeholder="bash, sh, powershell"
+            />
+          </div>
 
-        <.input
-          field={@form[:notes]}
-          type="textarea"
-          rows="3"
-          label="Notes"
-        />
+          <div class="fieldset mb-2">
+            <label for="payload-target-tools" class="label mb-1">Target tools</label>
+            <input
+              id="payload-target-tools"
+              type="text"
+              name="payload[target_tools_text]"
+              value={@target_tools}
+              placeholder="base64, curl, nc"
+              class="w-full input"
+            />
+            <p class="mt-1 text-xs text-base-content/60">
+              Comma-separated capabilities available on the target.
+            </p>
+          </div>
+        </div>
+      </section>
 
-        <.input
-          field={@form[:recipe_id]}
-          type="select"
-          label="Default recipe"
-          prompt="No recipe"
-          options={Enum.map(@recipes, &{&1.name, &1.id})}
-        />
+      <section class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body gap-4">
+          <h2 class="card-title text-base">Curation</h2>
+          <div class="fieldset mb-2">
+            <label for="payload-tags" class="label mb-1">Tags</label>
+            <input
+              id="payload-tags"
+              type="text"
+              name="payload[tags]"
+              value={@tag_names}
+              placeholder="linux, reverse-shell, ctf"
+              class="w-full input"
+            />
+            <p class="mt-1 text-xs text-base-content/60">
+              Comma-separated. Missing tags are created on save.
+            </p>
+          </div>
 
-        <div class="fieldset mb-2">
-          <label for="payload-tags" class="label mb-1">Tags</label>
-          <input
-            id="payload-tags"
-            type="text"
-            name="payload[tags]"
-            value={@tag_names}
-            placeholder="unix, linux"
-            class="w-full input"
+          <.input
+            field={@form[:notes]}
+            type="textarea"
+            rows="4"
+            label="Context & caveats"
+            placeholder="Authorization scope, listener expectations, cleanup, detection notes…"
           />
-          <p class="mt-1 text-xs text-base-content/60">
-            Comma-separated. Missing tags are created on save.
-          </p>
-        </div>
 
-        <div class="flex gap-2">
-          <button type="submit" class="btn btn-primary">Save payload</button>
-          <.button navigate={~p"/payloads"}>Cancel</.button>
+          <.input
+            field={@form[:recipe_id]}
+            type="select"
+            label="Default recipe"
+            prompt="No recipe"
+            options={Enum.map(@recipes, &{&1.name, &1.id})}
+          />
         </div>
-      </.form>
-    </div>
+      </section>
+
+      <div class="sticky bottom-4 z-10 flex flex-wrap gap-2 rounded-box border border-base-300 bg-base-100/95 p-3 shadow-lg backdrop-blur">
+        <button type="submit" class="btn btn-primary" phx-disable-with="Saving…">
+          Save payload
+        </button>
+        <.button navigate={~p"/payloads"}>Cancel</.button>
+      </div>
+    </.form>
   </div>
 </Layouts.app>
