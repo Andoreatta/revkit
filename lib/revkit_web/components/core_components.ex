@@ -322,8 +322,11 @@ defmodule RevkitWeb.CoreComponents do
 
   def header(assigns) do
     ~H"""
-    <header class={[@actions != [] && "flex items-center justify-between gap-6", "pb-4"]}>
-      <div>
+    <header class={[
+      "pb-4",
+      @actions != [] && "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
+    ]}>
+      <div class="min-w-0">
         <h1 class="text-lg font-semibold leading-8">
           {render_slot(@inner_block)}
         </h1>
@@ -331,7 +334,9 @@ defmodule RevkitWeb.CoreComponents do
           {render_slot(@subtitle)}
         </p>
       </div>
-      <div class="flex-none">{render_slot(@actions)}</div>
+      <div :if={@actions != []} class="flex flex-wrap gap-2 sm:flex-none">
+        {render_slot(@actions)}
+      </div>
     </header>
     """
   end

@@ -4,7 +4,12 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={get_csrf_token()} />
-    <.live_title default="Revkit" suffix=" · Revkit" phx-no-format>{assigns[:page_title]}</.live_title>
+    <meta
+      name="description"
+      content="RevKit — compose, validate, and copy offensive-security payload strings for authorized testing."
+    />
+    <.live_title default="RevKit" suffix=" · Payload Studio" phx-no-format>{assigns[:page_title]}</.live_title>
+    <link rel="icon" href={~p"/images/logo.svg"} type="image/svg+xml" />
     <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
     <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
     </script>
@@ -37,7 +42,7 @@
       })();
     </script>
   </head>
-  <body>
+  <body class="flex min-h-screen flex-col bg-base-200 text-base-content antialiased">
     {@inner_content}
   </body>
 </html>
