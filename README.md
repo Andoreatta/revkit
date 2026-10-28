@@ -16,16 +16,37 @@ no JSON API and no authentication by design.
   compatibility warnings for transform requirements
 - Transform pitfalls surfaced before the copy control
 - Copy-to-clipboard preview button (colocated LiveView hook)
-- Payload CRUD with tags, notes, favorites, and target metadata
+- A public, read-only catalog of payloads and recipes
+- Per-browser private editions created with **Improve**; other cookies never see
+  them and the public original is never modified
+- No public delete: only a private edition can be discarded
 - Saved recipe snapshots containing template, variable values, chain, target
   metadata, notes, tags, and favorite status
-- Recipe reopen, fork, search, and payload/recipe search
-- Tag management (create, rename, delete) plus payload/recipe tag assignment
-- Favorite and tag filters in the payload and recipe catalogs
+- Recipe reopen, search, and owner-scoped payload/recipe search
+- A fixed tag vocabulary (24 tags, at most 3 per entry), shown read-only
+- Favorite and tag filters for the current browser's editions
+- Explicit limits for fields, variables, steps, tags, and private editions
 - Responsive catalog pages, context pages, and a mobile navigation menu
 - Curated starter catalog with target assumptions and usage context
 - Nonce-based Content-Security-Policy
 - Quality gates: Credo, Sobelow, Dialyzer, ExUnit
+
+## Public catalog and private editions
+
+The seeded payloads and recipes are public and read-only. **Improve** copies a
+public entry into a private edition owned by your browser; **New private
+payload/recipe** creates one from scratch. Your editions appear alongside the
+public catalog only for your cookie.
+
+- The public original is never hidden, edited, or deleted.
+- Other browsers continue to see the public original and their own editions.
+- `Discard edition` deletes only your private copy.
+- Tags are a fixed vocabulary and cannot be created, renamed, or deleted in the
+  UI.
+- Clearing cookies starts a new empty identity; private editions are not
+  recoverable without the original cookie.
+
+This is intentionally **not** an account system. See the security note below.
 
 ## Requirements
 
@@ -123,10 +144,12 @@ The production config enables `force_ssl` and trusts `X-Forwarded-Proto`; make
 sure the proxy sets that header. `localhost` and `127.0.0.1` are excluded from
 the redirect so local Docker access works without TLS.
 
-**Security note:** there is no authentication. Anyone who can reach the app can
-generate payloads and edit the catalog. If it is exposed publicly, protect it
-with network ACLs, a VPN, or an authenticating proxy. Do not expose it
-accidentally.
+**Security note:** there is no authentication. The public catalog is read-only,
+and a signed one-year cookie scopes private editions to one browser, but that
+cookie is identity, not access control. Anyone who can reach the app can read
+the public catalog and create their own editions; clearing the cookie loses
+access to the previous editions. If the app is exposed publicly, protect it with
+network ACLs, a VPN, or an authenticating proxy. Do not expose it accidentally.
 
 ### Building and running without Compose
 
@@ -155,13 +178,15 @@ docker build \
 | Path | Purpose |
 |---|---|
 | `/`, `/generate` | Generator and live preview |
-| `/payloads` | Payload catalog |
-| `/payloads/new`, `/payloads/:id/edit` | Payload forms |
-| `/payloads/:id` | Payload context page |
-| `/recipes` | Saved recipe snapshots |
-| `/recipes/new`, `/recipes/:id/edit` | Recipe forms |
-| `/recipes/:id` | Recipe snapshot page |
-| `/tags` | Tag curation |
+| `/payloads` | Public payload catalog + your editions |
+| `/payloads/new` | New private payload |
+| `/payloads/:id/edit` | Edit your payload edition |
+| `/payloads/:id` | Payload context page (public or your edition) |
+| `/recipes` | Public recipe catalog + your editions |
+| `/recipes/new` | New private recipe |
+| `/recipes/:id/edit` | Edit your recipe edition |
+| `/recipes/:id` | Recipe snapshot page (public or your edition) |
+| `/tags` | Read-only tag vocabulary and usage |
 | `/health` | Container liveness check |
 | `/dev/dashboard` | LiveDashboard, dev only |
 
@@ -173,8 +198,8 @@ docker build \
   netcat bind, and Perl reverse/bind templates
 - Base64, URL-encode, and Bash-wrapper recipes, including transport-encoded
   variants
-- Tags, favorites, notes, target assumptions, and a “when to use” description
-  for every entry
+- A fixed 24-tag vocabulary, notes, target assumptions, and a “when to use”
+  description for every entry; at most three tags per entry
 
 The seeds are templates for **authorized labs, CTFs, and scoped engagements**.
 They are strings only; RevKit never executes them. Encoded recipes are transport
@@ -190,6 +215,10 @@ docker compose exec revkit /app/bin/seed
 
 - `Revkit.Engine.*` is pure: no Ecto, Phoenix, IO, or process state.
 - `Revkit.Catalog` is the only domain module that touches `Revkit.Repo`.
+- Public rows have `owner_id = nil`; private editions carry a cookie owner and a
+  `source_*_id` pointing at the public row they improve. Catalog reads return
+  public + current-owner rows only, and public writes are rejected.
+- `Revkit.Limits` defines every field, variable, step, tag, and quota limit.
 - Transforms implement `Revkit.Transform`; recipe keys are resolved through
   `Revkit.Engine.Transforms`.
 - `Revkit.Engine.Template` performs `{{NAME}}` substitution without escaping or
@@ -204,7 +233,12 @@ docker compose exec revkit /app/bin/seed
 ## Known limitations
 
 - No JSON API.
-- No authentication or multi-user accounts.
+- No authentication or multi-user accounts. A signed cookie scopes private
+  editions to one browser; clearing it loses them, and it is not a security
+  boundary.
+- The public catalog cannot be edited or deleted from the UI; changes are
+  private editions.
+- Tags are a fixed, seeded vocabulary; there is no tag CRUD.
 - SQLite single-instance deployment only.
 - Transform `requires` are capability strings compared with target metadata;
   they cannot prove that a remote host actually has the capability.

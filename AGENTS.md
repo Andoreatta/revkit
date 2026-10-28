@@ -11,8 +11,13 @@ anything. The pure engine (`Revkit.Transform`, `Revkit.Engine.Chain`,
 `Revkit.Engine.Transforms`, `Revkit.Engine.Template`, `Revkit.Engine.Validator`),
 the persistence layer (`Revkit.Catalog`), and the LiveView UI (`GenerateLive`,
 `PayloadLive.*`, `RecipeLive.*`, `TagLive.Index`) are in place. `/` and
-`/generate` both open the generator. This file describes the target architecture;
-update the stale lines as the code lands.
+`/generate` both open the generator.
+
+The catalog is **public and read-only**. A browser may improve a public payload
+or recipe into a private edition scoped to its signed cookie, or create a new
+private entry. Other cookies never see those editions. There is no public
+delete. This file describes the target architecture; update the stale lines as
+the code lands.
 
 ## Commands
 
@@ -49,7 +54,13 @@ reintroduce ad-hoc lint/type/security commands outside the precommit alias.
     metadata, notes, and a favorite flag. `Recipe` is a saved generation
     snapshot: template, variable values, ordered transform steps as JSON
     (`%{"key" => ..., "options" => ...}`), target metadata, notes, favorite, and
-    tags; reopening it must reproduce the exact saved combination. **← NOVO**
+    tags; reopening it must reproduce the exact saved combination.
+    `owner_id` is `nil` for public rows and a cookie token for private editions;
+    `source_payload_id` / `source_recipe_id` point at the public row being
+    improved. **← NOVO**
+  - `lib/revkit/limits.ex` — the single source of truth for every product limit
+    (field lengths, variables, steps, tags, private-edition quotas, search
+    length). Schemas and forms read from it. **← NOVO**
 - `lib/revkit_web/` — endpoint, router, controllers, components, layouts.
 - `lib/revkit_web.ex` — single macro entrypoint (`use RevkitWeb, :live_view |
   :controller | :html`). Put app-wide imports/aliases in `html_helpers`.
@@ -61,6 +72,9 @@ reintroduce ad-hoc lint/type/security commands outside the precommit alias.
 - `lib/revkit_web/plugs/content_security_policy.ex` — nonce-based CSP for the
   browser pipeline. Inline scripts must use `nonce={@csp_nonce}`; the
   LiveDashboard is configured with `csp_nonce_assign_key: :csp_nonce`.
+- `lib/revkit_web/plugs/owner.ex` — ensures the signed session cookie contains a
+  stable `owner_id`; `lib/revkit_web/owner.ex` copies it into LiveView assigns
+  through `on_mount`. The cookie lasts one year and is identity, not auth. **← NOVO**
 - `RevkitWeb.CoreComponents` — `flash`, `button`, `input`, `table`, `list`,
   `header`, `icon`. `RevkitWeb.Layouts` — `app/1`, `flash_group/1`,
   `theme_toggle/1`, plus `layouts/root.html.heex`.
@@ -72,7 +86,7 @@ reintroduce ad-hoc lint/type/security commands outside the precommit alias.
 - `lib/revkit_web/components/step_editor.ex` — shared ordered transform editor
   used by the generator and recipe form.
 - `lib/revkit_web/components/ui.ex` — small shared presentation components
-  (empty state, target/tag badges, favorite button, code block).
+  (empty state, target/tag badges, tag picker, favorite button, code block).
 - New LiveViews belong in `lib/revkit_web/live/` as `RevkitWeb.XLive`; routes can
   use `live "/x", XLive` because the browser scope is aliased to `RevkitWeb`.
 - `Dockerfile`, `compose.yaml`, `.env.example`, and `docker/entrypoint.sh` — the
@@ -92,6 +106,27 @@ the design collapses.
 - **`Revkit.Catalog` is the only place that touches `Revkit.Repo`.** LiveViews
   and the engine never call `Repo.*` directly. LiveViews call `Catalog` and
   `Engine`; the engine calls nothing outside itself.
+- **Public rows are immutable.** Public payloads and recipes (`owner_id` `nil`)
+  are seeded and must never be updated or deleted by a user action. The only
+  mutation is `improve_*` copying a public row into a private edition, and
+  `discard_*` deleting the owner's edition. Do not add public delete/update
+  functions or UI.
+- **Private editions are cookie-scoped.** Every read/search returns public rows
+  plus only the current `owner_id`'s editions. `get_*` must 404 another owner's
+  row. Context writes take the owner, check it, and reject public rows with
+  `{:error, :forbidden}`. The unique `(owner_id, source_*_id)` index keeps one
+  edition per public source per owner.
+- **Tags are a fixed vocabulary.** No create, rename, or delete UI or context
+  mutation for users. `Catalog.ensure_tags/1` and `create_tag/1` are seed/setup
+  helpers only and enforce the vocabulary cap. Forms use the `UI.tag_picker`
+  multi-select and every payload/recipe is capped at three tags.
+- **All limits live in `Revkit.Limits`.** Schemas enforce them, forms show helper
+  text, and the private quota is checked in `improve_*`/`create_*`. Do not
+  hardcode a limit in a schema or template.
+- **The cookie is identity, not authentication.** Clearing it loses access to
+  private editions; it is not a security boundary and must not be described as
+  one. Public rows remain visible without it. Keep `http_only`, `same_site:
+  "Lax"`, and the one-year `max_age`.
 - **Direction of dependency:** `RevkitWeb.Live → Revkit.Catalog → Revkit.Repo`
   and `RevkitWeb.Live → Revkit.Engine`. Never the reverse. The engine must not
   depend on the catalog.
@@ -162,8 +197,10 @@ the design collapses.
 - SQLite: dev uses `revkit_dev.db`, test uses `revkit_test.db`, both at the repo
   root. Do not mark DB tests `async: true` (single writer). Use
   `RevkitWeb.ConnCase` / `Revkit.DataCase`; the sandbox is `:manual` in
-  `test_helper.exs`. The engine tests, being pure, **can** and **should** be
-  `async: true`. **← NOVO (segunda frase)**
+  `test_helper.exs`. `RevkitWeb.ConnCase` builds a signed `_revkit_key` cookie so
+  the static render and the connected LiveView share one owner; use
+  `owner_conn/1` for a second cookie. The engine tests, being pure, **can** and
+  **should** be `async: true`. **← NOVO**
 - Migrations: `mix ecto.gen.migration name_using_underscores`; schema timestamps
   are `:utc_datetime`.
 - Production requires `DATABASE_PATH` and `SECRET_KEY_BASE`
@@ -186,9 +223,9 @@ the design collapses.
 - Build in this order: (1) pure engine + ExUnit tests, (2) `Catalog` schemas +
   context, (3) LiveViews, (4) validation/warnings in the UI, (5) colocated hook
   for copy, (6) template variables and target metadata, (7) full saved-generation
-  Recipe snapshots and reopening, (8) curation (tags, favorites, notes, search).
-  Do not skip ahead — LiveViews generated before the engine works will get
-  rewritten.
+  Recipe snapshots and reopening, (8) public/private editions, fixed tags,
+  limits, and owner-scoped search. Do not skip ahead — LiveViews generated before
+  the engine works will get rewritten.
 - Prompt the agent with the layer boundaries explicitly, e.g. *"pure functions
   only, no Ecto, no Phoenix"* for engine work.
 - `/undo` relies on Git. Commit after each layer passes `mix precommit`. Use
