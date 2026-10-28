@@ -165,11 +165,35 @@ defmodule Revkit.Catalog do
     |> Repo.insert()
   end
 
+  @doc "Creates a recipe snapshot and assigns tags in one transaction."
+  def create_recipe_with_tags(attrs, tag_names) do
+    Repo.transaction(fn ->
+      with {:ok, recipe} <- create_recipe(attrs),
+           {:ok, recipe} <- put_recipe_tag_names(recipe, tag_names) do
+        recipe
+      else
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+    end)
+  end
+
   @doc "Updates a recipe snapshot."
   def update_recipe(%Recipe{} = recipe, attrs) do
     recipe
     |> Recipe.changeset(attrs)
     |> Repo.update()
+  end
+
+  @doc "Updates a recipe snapshot and replaces its tags in one transaction."
+  def update_recipe_with_tags(%Recipe{} = recipe, attrs, tag_names) do
+    Repo.transaction(fn ->
+      with {:ok, recipe} <- update_recipe(recipe, attrs),
+           {:ok, recipe} <- put_recipe_tag_names(recipe, tag_names) do
+        recipe
+      else
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+    end)
   end
 
   @doc "Deletes a recipe. Payloads that reference it keep a `nil` recipe id."
@@ -203,9 +227,14 @@ defmodule Revkit.Catalog do
       ])
       |> Map.put(:name, "#{recipe.name} (copy)")
 
-    with {:ok, forked} <- %Recipe{} |> Recipe.changeset(attrs) |> Repo.insert() do
-      put_recipe_tags(forked, Enum.map(recipe.tags, & &1.id))
-    end
+    Repo.transaction(fn ->
+      with {:ok, forked} <- %Recipe{} |> Recipe.changeset(attrs) |> Repo.insert(),
+           {:ok, forked} <- put_recipe_tags(forked, Enum.map(recipe.tags, & &1.id)) do
+        forked
+      else
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+    end)
   end
 
   @doc "Replaces a recipe's tags with the tags identified by `tag_ids`."

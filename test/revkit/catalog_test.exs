@@ -268,6 +268,15 @@ defmodule Revkit.CatalogTest do
       assert unfavorited.favorite == false
     end
 
+    test "create_recipe_with_tags/2 rolls back when a tag is invalid" do
+      long_name = String.duplicate("a", 41)
+
+      assert {:error, changeset} = Catalog.create_recipe_with_tags(%{name: "Recipe"}, [long_name])
+      assert %{name: [message]} = errors_on(changeset)
+      assert message =~ "at most 40"
+      assert Catalog.list_recipes() == []
+    end
+
     test "create_recipe/1 defaults steps to an empty list" do
       assert {:ok, %Recipe{steps: []}} = Catalog.create_recipe(%{name: "Empty"})
     end
