@@ -22,6 +22,7 @@ defmodule RevkitWeb.RecipeLive.Form do
     |> assign(:recipe, recipe)
     |> assign(:steps, [])
     |> assign(:selected_tag_ids, [])
+    |> assign(:tag_errors, [])
     |> assign(:target_tools, "")
     |> assign(:form, to_form(Recipe.changeset(recipe, %{})))
   end
@@ -33,6 +34,7 @@ defmodule RevkitWeb.RecipeLive.Form do
     |> assign(:recipe, recipe)
     |> assign(:steps, StepEditor.to_editor_steps(recipe.steps))
     |> assign(:selected_tag_ids, Enum.map(recipe.tags, & &1.id))
+    |> assign(:tag_errors, [])
     |> assign(:target_tools, Enum.join(recipe.target_tools, ", "))
     |> assign(:form, to_form(Recipe.changeset(recipe, %{})))
   end
@@ -46,11 +48,14 @@ defmodule RevkitWeb.RecipeLive.Form do
       |> Recipe.changeset(attrs(params, steps))
       |> Map.put(:action, :validate)
 
+    selected_tag_ids = parse_tag_ids(params["tags"])
+
     {:noreply,
      assign(socket,
        form: to_form(changeset),
        steps: steps,
-       selected_tag_ids: parse_tag_ids(params["tags"]),
+       selected_tag_ids: selected_tag_ids,
+       tag_errors: tag_errors(selected_tag_ids),
        target_tools: Map.get(params, "target_tools_text", socket.assigns.target_tools)
      )}
   end
@@ -102,21 +107,26 @@ defmodule RevkitWeb.RecipeLive.Form do
   end
 
   defp handle_save_result({:error, :limit_reached}, socket, params, steps) do
+    selected_tag_ids = parse_tag_ids(params["tags"])
+
     {:noreply,
      socket
      |> put_flash(:error, "You have reached the private edition limit")
      |> assign(:steps, steps)
-     |> assign(:selected_tag_ids, parse_tag_ids(params["tags"]))}
+     |> assign(:selected_tag_ids, selected_tag_ids)
+     |> assign(:tag_errors, tag_errors(selected_tag_ids))}
   end
 
   defp handle_save_result({:error, %Ecto.Changeset{} = changeset}, socket, params, steps) do
     action = if socket.assigns.live_action == :new, do: :insert, else: :update
+    selected_tag_ids = parse_tag_ids(params["tags"])
 
     {:noreply,
      assign(socket,
        form: to_form(changeset, action: action),
        steps: steps,
-       selected_tag_ids: parse_tag_ids(params["tags"]),
+       selected_tag_ids: selected_tag_ids,
+       tag_errors: tag_errors(selected_tag_ids),
        target_tools: params["target_tools_text"] || ""
      )}
   end
@@ -141,5 +151,13 @@ defmodule RevkitWeb.RecipeLive.Form do
       end
     end)
     |> Enum.reverse()
+  end
+
+  defp tag_errors(tag_ids) do
+    if length(Enum.uniq(tag_ids)) > Revkit.Limits.max_tags() do
+      [{"may contain at most %{count} tags", [count: Revkit.Limits.max_tags()]}]
+    else
+      []
+    end
   end
 end

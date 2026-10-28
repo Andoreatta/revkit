@@ -24,6 +24,7 @@ defmodule RevkitWeb.PayloadLive.Form do
     socket
     |> assign(:payload, payload)
     |> assign(:selected_tag_ids, [])
+    |> assign(:tag_errors, [])
     |> assign(:target_tools, "")
     |> assign(:form, to_form(Payload.changeset(payload, %{})))
   end
@@ -34,6 +35,7 @@ defmodule RevkitWeb.PayloadLive.Form do
     socket
     |> assign(:payload, payload)
     |> assign(:selected_tag_ids, Enum.map(payload.tags, & &1.id))
+    |> assign(:tag_errors, [])
     |> assign(:target_tools, Enum.join(payload.target_tools, ", "))
     |> assign(:form, to_form(Payload.changeset(payload, %{})))
   end
@@ -47,10 +49,13 @@ defmodule RevkitWeb.PayloadLive.Form do
       |> Payload.changeset(attrs)
       |> Map.put(:action, :validate)
 
+    selected_tag_ids = parse_tag_ids(params["tags"])
+
     {:noreply,
      assign(socket,
        form: to_form(changeset),
-       selected_tag_ids: parse_tag_ids(params["tags"]),
+       selected_tag_ids: selected_tag_ids,
+       tag_errors: tag_errors(selected_tag_ids),
        target_tools: Map.get(params, "target_tools_text", socket.assigns.target_tools)
      )}
   end
@@ -91,19 +96,24 @@ defmodule RevkitWeb.PayloadLive.Form do
   end
 
   defp handle_save_result({:error, :limit_reached}, socket, params) do
+    selected_tag_ids = parse_tag_ids(params["tags"])
+
     {:noreply,
      socket
      |> put_flash(:error, "You have reached the private edition limit")
-     |> assign(:selected_tag_ids, parse_tag_ids(params["tags"]))}
+     |> assign(:selected_tag_ids, selected_tag_ids)
+     |> assign(:tag_errors, tag_errors(selected_tag_ids))}
   end
 
   defp handle_save_result({:error, %Ecto.Changeset{} = changeset}, socket, params) do
     action = if socket.assigns.live_action == :new, do: :insert, else: :update
+    selected_tag_ids = parse_tag_ids(params["tags"])
 
     {:noreply,
      assign(socket,
        form: to_form(changeset, action: action),
-       selected_tag_ids: parse_tag_ids(params["tags"]),
+       selected_tag_ids: selected_tag_ids,
+       tag_errors: tag_errors(selected_tag_ids),
        target_tools: params["target_tools_text"] || ""
      )}
   end
@@ -122,5 +132,13 @@ defmodule RevkitWeb.PayloadLive.Form do
       end
     end)
     |> Enum.reverse()
+  end
+
+  defp tag_errors(tag_ids) do
+    if length(Enum.uniq(tag_ids)) > Revkit.Limits.max_tags() do
+      [{"may contain at most %{count} tags", [count: Revkit.Limits.max_tags()]}]
+    else
+      []
+    end
   end
 end

@@ -88,6 +88,9 @@
             <p class="mt-1 text-xs text-base-content/60">
               Comma-separated, up to {Revkit.Limits.max_tools()} tools of {Revkit.Limits.max_tool_length()} characters each.
             </p>
+            <p :for={error <- @form[:target_tools].errors} class="mt-1 text-sm text-error">
+              {translate_error(error)}
+            </p>
           </div>
         </div>
       </section>
@@ -101,6 +104,7 @@
             tags={@tags}
             selected={@selected_tag_ids}
             name="payload[tags][]"
+            errors={@tag_errors}
           />
 
           <.input

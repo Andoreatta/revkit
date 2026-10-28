@@ -49,6 +49,7 @@ defmodule RevkitWeb.UI do
   attr :selected, :list, default: []
   attr :name, :string, required: true
   attr :id, :string, required: true
+  attr :errors, :list, default: []
 
   def tag_picker(assigns) do
     ~H"""
@@ -71,6 +72,9 @@ defmodule RevkitWeb.UI do
       </div>
       <p class="mt-1 text-xs text-base-content/60">
         Choose up to {Revkit.Limits.max_tags()} tags from the fixed vocabulary.
+      </p>
+      <p :for={error <- @errors} class="mt-1 text-sm text-error">
+        {translate_error(error)}
       </p>
     </fieldset>
     """

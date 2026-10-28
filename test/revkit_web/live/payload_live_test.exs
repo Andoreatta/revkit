@@ -89,6 +89,24 @@ defmodule RevkitWeb.PayloadLiveTest do
     assert payload.tags |> Enum.map(& &1.name) |> Enum.sort() == ["unix", "web"]
   end
 
+  test "shows the tag limit error and does not insert", %{conn: conn} do
+    tags = Enum.map(1..4, fn index -> tag!("limit-#{index}") end)
+
+    {:ok, view, _html} = live(conn, ~p"/payloads/new")
+
+    html =
+      render_submit(view, "save", %{
+        "payload" => %{
+          "name" => "Too many tags",
+          "template" => "id",
+          "tags" => Enum.map(tags, &to_string(&1.id))
+        }
+      })
+
+    assert html =~ "may contain at most 3 tags"
+    assert Catalog.list_owned_payloads(@owner) == []
+  end
+
   test "shows validation errors and does not insert", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/payloads/new")
 

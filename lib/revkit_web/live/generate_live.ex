@@ -25,6 +25,7 @@ defmodule RevkitWeb.GenerateLive do
        payload_options: option_labels(payloads),
        tags: Catalog.list_tags(),
        save_tag_ids: [],
+       save_tag_errors: [],
        template: "",
        variables: %{},
        variable_names: [],
@@ -125,13 +126,22 @@ defmodule RevkitWeb.GenerateLive do
          |> push_navigate(to: ~p"/recipes")}
 
       {:error, :limit_reached} ->
-        {:noreply, put_flash(socket, :error, "You have reached the private edition limit")}
+        selected_tag_ids = parse_tag_ids(params["tags"])
+
+        {:noreply,
+         socket
+         |> put_flash(:error, "You have reached the private edition limit")
+         |> assign(:save_tag_ids, selected_tag_ids)
+         |> assign(:save_tag_errors, tag_errors(selected_tag_ids))}
 
       {:error, %Ecto.Changeset{} = changeset} ->
+        selected_tag_ids = parse_tag_ids(params["tags"])
+
         {:noreply,
          assign(socket,
            save_form: to_form(changeset, action: :insert),
-           save_tag_ids: parse_tag_ids(params["tags"])
+           save_tag_ids: selected_tag_ids,
+           save_tag_errors: tag_errors(selected_tag_ids)
          )}
 
       {:error, _reason} ->
@@ -394,6 +404,14 @@ defmodule RevkitWeb.GenerateLive do
       end
     end)
     |> Enum.reverse()
+  end
+
+  defp tag_errors(tag_ids) do
+    if length(Enum.uniq(tag_ids)) > Revkit.Limits.max_tags() do
+      [{"may contain at most %{count} tags", [count: Revkit.Limits.max_tags()]}]
+    else
+      []
+    end
   end
 
   defp find_payload(id, payloads) do
