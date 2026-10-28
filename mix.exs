@@ -73,7 +73,8 @@ defmodule Revkit.MixProject do
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:sobelow, "~> 0.17.0", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -109,6 +110,7 @@ defmodule Revkit.MixProject do
         "deps.unlock --unused",
         "format",
         "credo",
+        "sobelow --skip",
         "test",
         "dialyzer"
       ]
