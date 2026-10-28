@@ -1,0 +1,21 @@
+services:
+  revkit:
+    build:
+      context: .
+    image: revkit:latest
+    env_file:
+      - .env
+    environment:
+      PHX_SERVER: "true"
+      DATABASE_PATH: /data/revkit.db
+    ports:
+      - "${REVKIT_BIND:-127.0.0.1}:${REVKIT_PORT:-4000}:4000"
+    volumes:
+      - revkit_data:/data
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  revkit_data:
