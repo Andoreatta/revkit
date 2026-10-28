@@ -6,11 +6,15 @@ skinparam packageStyle rectangle
 actor "Usuário" as usuario
 
 rectangle "RevKit" {
-  usecase "Gerar payload" as UC1
-  usecase "Salvar receita de geração" as UC2
-  usecase "Reabrir receita salva" as UC3
-  usecase "Criar edição privada" as UC4
-  usecase "Pesquisar e filtrar catálogo" as UC5
+  usecase "Favoritar edição privada" as UC9
+  usecase "Pesquisar e filtrar catálogo" as UC8
+  usecase "Editar ou descartar\nedição privada" as UC7
+  usecase "Criar edição privada" as UC6
+  usecase "Reabrir receita salva" as UC5
+  usecase "Salvar receita de geração" as UC4
+  usecase "Gerar payload" as UC3
+  usecase "Criar payload privado" as UC2
+  usecase "Consultar catálogo público" as UC1
 }
 
 usuario --> UC1
@@ -18,21 +22,21 @@ usuario --> UC2
 usuario --> UC3
 usuario --> UC4
 usuario --> UC5
+usuario --> UC6
+usuario --> UC7
+usuario --> UC8
+usuario --> UC9
 
-note right of UC1
+note right of UC3
   Inclui pré-visualização,
   validação de compatibilidade
   e cópia do resultado.
 end note
 
-note right of UC4
-  A edição privada pode ser
-  editada ou descartada sem
-  alterar o catálogo público.
-end note
-
-note bottom of UC5
-  Filtros por favoritos e tags.
+note right of UC6
+  O item público permanece
+  inalterado para os demais
+  navegadores.
 end note
 
 @enduml

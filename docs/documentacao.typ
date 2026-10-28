@@ -217,8 +217,9 @@ portabilidade e usabilidade (PRESSMAN; MAXIM, 2021).
     [RF10], [Salvar uma receita com template, variáveis, cadeia, alvo, notas, tags e favorito.],
     [RF11], [Reabrir uma receita salva com a mesma combinação de geração.],
     [RF12], [Pesquisar e filtrar por texto, favoritos e tag.],
-    [RF13], [Aplicar o vocabulário fixo de tags e favoritar edições privadas.],
-    [RF14], [Exibir estados vazios, avisos de compatibilidade e erros de limite.],
+    [RF13], [Aplicar o vocabulário fixo de tags.],
+    [RF14], [Favoritar edições privadas.],
+    [RF15], [Exibir estados vazios, avisos de compatibilidade e erros de limite.],
   ),
   caption: [Requisitos funcionais do RevKit.],
   supplement: [Tabela],
@@ -238,7 +239,7 @@ portabilidade e usabilidade (PRESSMAN; MAXIM, 2021).
     [RNF06], [Usar SQLite embutido com uma única instância de escrita.],
     [RNF07], [Centralizar limites de campos, variáveis, passos, tags e edições em `Revkit.Limits`.],
     [RNF08], [Aplicar CSP com nonce e bloquear scripts inline sem nonce.],
-    [RNF09], [Passar por `mix precommit`, incluindo testes, Credo, Sobelow e Dialyzer.],
+    [RNF09], [Passar pelo gate `mix precommit` (compilação, formatação, Credo, Sobelow, testes e Dialyzer).],
     [RNF10], [Empacotar em Docker, executar como usuário não-root e expor `/health`.],
   ),
   caption: [Requisitos não funcionais do RevKit.],
@@ -247,35 +248,45 @@ portabilidade e usabilidade (PRESSMAN; MAXIM, 2021).
 
 == Casos de Uso
 
-O ator do sistema é o *Usuário*. A @fig-caso apresenta os cinco casos de
-uso principais; a @tab-uc resume o objetivo de cada um.
+O ator do sistema é o *Usuário*. A @fig-caso apresenta os nove casos de uso;
+a @tab-uc resume o objetivo e os requisitos relacionados de cada um.
+
+
+#[
+  #set text(size: 9.5pt)
+  #figure(
+    table(
+      columns: (1.1cm, 3.4cm, 1fr, 2.0cm),
+      inset: 3pt,
+      stroke: 0.5pt + rgb("#d1d5db"),
+      table.header([*ID*], [*Caso de uso*], [*Objetivo*], [*Requisitos*]),
+      [UC01], [Consultar catálogo público], [Navegar pelo catálogo público de payloads e receitas.], [RF01],
+      [UC02], [Criar payload privado], [Criar um payload com template, alvo, notas e tags.], [RF02, RF13],
+      [UC03], [Gerar payload], [Selecionar template, preencher variáveis, configurar a cadeia, visualizar, validar e copiar.], [RF05–RF09],
+      [UC04], [Salvar receita], [Persistir nome, template, variáveis, cadeia, alvo, notas, tags e favorito.], [RF10, RF13],
+      [UC05], [Reabrir receita], [Restaurar o snapshot completo e pré-visualizar a mesma combinação.], [RF11],
+      [UC06], [Criar edição privada], [Copiar um item público para uma edição privada sem alterar o original.], [RF03],
+      [UC07], [Editar ou descartar edição privada], [Alterar ou remover somente a própria edição.], [RF04, RF13],
+      [UC08], [Pesquisar e filtrar catálogo], [Buscar por texto, favoritos e tag entre itens públicos e edições próprias.], [RF12],
+      [UC09], [Favoritar edição privada], [Marcar ou desmarcar uma edição própria como favorita.], [RF14],
+    ),
+    caption: [Casos de uso do RevKit.],
+    supplement: [Tabela],
+  ) <tab-uc>
+]
+
+O caso UC03 concentra a pré-visualização, a validação e a cópia, mas não grava
+no banco. A gravação ocorre apenas em UC04. UC05 restaura template, variáveis,
+cadeia, alvo, notas e tags. UC06 cria uma cópia privada sem modificar o item
+público. UC07 permite editar ou descartar somente a própria edição. UC08
+considera o catálogo público e as edições do cookie atual. UC09 permite
+favoritar apenas edições privadas.
 
 #figure(
   image("diagramas/casos-de-uso.png", width: 100%),
   caption: [Diagrama de Caso de Uso do RevKit.],
   supplement: [Figura],
 ) <fig-caso>
-
-#figure(
-  table(
-    columns: (1.3cm, 4.2cm, 1fr),
-    inset: 4pt,
-    stroke: 0.5pt + rgb("#d1d5db"),
-    table.header([*ID*], [*Caso de uso*], [*Objetivo*]),
-    [UC01], [Gerar payload], [Selecionar template, preencher variáveis, configurar a cadeia, visualizar, validar e copiar.],
-    [UC02], [Salvar receita], [Persistir nome, template, variáveis, cadeia, alvo, notas, tags e favorito.],
-    [UC03], [Reabrir receita], [Restaurar o snapshot completo e pré-visualizar a mesma combinação.],
-    [UC04], [Criar edição privada], [Melhorar um item público e editar ou descartar somente a própria cópia.],
-    [UC05], [Pesquisar catálogo], [Buscar por texto, favoritos e tag entre itens públicos e edições próprias.],
-  ),
-  caption: [Casos de uso principais.],
-  supplement: [Tabela],
-) <tab-uc>
-
-O caso UC01 concentra a pré-visualização, a validação e a cópia, mas não grava
-no banco. A gravação ocorre apenas em UC02. UC03 restaura template, variáveis,
-cadeia, alvo, notas e tags. UC04 cria uma cópia privada sem modificar o item
-público. UC05 considera somente o catálogo público e as edições do cookie atual.
 
 == Arquitetura
 
@@ -374,8 +385,9 @@ executa o payload. A @fig-seq mostra o fluxo.
 == Catálogo e edições privadas
 
 O catálogo público é composto por oito payloads e seis receitas iniciais. Ele é
-somente leitura: o botão *Melhorar* copia um item para uma edição privada e
-vincula a cópia ao cookie atual. Uma edição pode ser editada ou descartada, mas
+somente leitura: o botão *Improve* (Melhorar) copia um item para uma edição
+privada e vincula a cópia ao cookie atual. Uma edição pode ser editada ou
+descartada, mas
 o item público permanece visível para todos os navegadores. O índice único
 `(owner_id, source_payload_id)` e o equivalente para receitas garantem uma
 edição por item público e por cookie.
@@ -429,8 +441,8 @@ acesso deve ser protegido por rede ou proxy autenticado (OWASP, 2026).
 A suíte possui 142 testes. Os testes do motor são puros e assíncronos; os testes
 de banco usam SQLite com sandbox; os testes de LiveView verificam formulários,
 navegação, limites, avisos e isolamento entre cookies. O comando
-`mix precommit` executa compilação sem avisos, verificação de dependências,
-formatação, Credo, Sobelow, testes e Dialyzer.
+`mix precommit` executa compilação sem avisos, limpeza de dependências não
+utilizadas, formatação, Credo, Sobelow, testes e Dialyzer.
 
 A aplicação também foi verificada em 320, 375, 768, 1024 e 1440 px, sem
 transbordamento horizontal. A imagem Docker foi construída e testada com
