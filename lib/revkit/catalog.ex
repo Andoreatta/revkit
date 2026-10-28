@@ -76,22 +76,7 @@ defmodule Revkit.Catalog do
   Returns an error changeset if any id does not reference an existing tag.
   """
   def put_payload_tags(%Payload{} = payload, tag_ids) when is_list(tag_ids) do
-    tag_ids = Enum.uniq(tag_ids)
-    tags = Repo.all(from tag in Tag, where: tag.id in ^tag_ids)
-    payload = Repo.preload(payload, :tags)
-
-    if length(tags) == length(tag_ids) do
-      payload
-      |> Payload.tags_changeset(tags)
-      |> Repo.update()
-    else
-      changeset =
-        payload
-        |> Payload.tags_changeset(tags)
-        |> Ecto.Changeset.add_error(:tags, "reference unknown tags")
-
-      {:error, changeset}
-    end
+    replace_tags(payload, &Payload.tags_changeset/2, tag_ids)
   end
 
   @doc """
@@ -101,9 +86,7 @@ defmodule Revkit.Catalog do
   de-duplicated and blank names are ignored.
   """
   def put_payload_tag_names(%Payload{} = payload, tag_names) do
-    with {:ok, tags} <- ensure_tags(normalize_tag_names(tag_names)) do
-      put_payload_tags(payload, Enum.map(tags, & &1.id))
-    end
+    put_tag_names(payload, &put_payload_tags/2, tag_names)
   end
 
   ## Recipes
@@ -239,29 +222,12 @@ defmodule Revkit.Catalog do
 
   @doc "Replaces a recipe's tags with the tags identified by `tag_ids`."
   def put_recipe_tags(%Recipe{} = recipe, tag_ids) when is_list(tag_ids) do
-    tag_ids = Enum.uniq(tag_ids)
-    tags = Repo.all(from tag in Tag, where: tag.id in ^tag_ids)
-    recipe = Repo.preload(recipe, :tags)
-
-    if length(tags) == length(tag_ids) do
-      recipe
-      |> Recipe.tags_changeset(tags)
-      |> Repo.update()
-    else
-      changeset =
-        recipe
-        |> Recipe.tags_changeset(tags)
-        |> Ecto.Changeset.add_error(:tags, "reference unknown tags")
-
-      {:error, changeset}
-    end
+    replace_tags(recipe, &Recipe.tags_changeset/2, tag_ids)
   end
 
   @doc "Replaces a recipe's tags with tags found or created by name."
   def put_recipe_tag_names(%Recipe{} = recipe, tag_names) do
-    with {:ok, tags} <- ensure_tags(normalize_tag_names(tag_names)) do
-      put_recipe_tags(recipe, Enum.map(tags, & &1.id))
-    end
+    put_tag_names(recipe, &put_recipe_tags/2, tag_names)
   end
 
   @doc "Toggles a payload's favorite flag."
@@ -307,6 +273,31 @@ defmodule Revkit.Catalog do
   @doc "Returns a changeset for tracking tag changes."
   def change_tag(%Tag{} = tag, attrs \\ %{}) do
     Tag.changeset(tag, attrs)
+  end
+
+  defp replace_tags(record, changeset_fun, tag_ids) do
+    tag_ids = Enum.uniq(tag_ids)
+    tags = Repo.all(from tag in Tag, where: tag.id in ^tag_ids)
+    record = Repo.preload(record, :tags)
+
+    if length(tags) == length(tag_ids) do
+      record
+      |> then(&changeset_fun.(&1, tags))
+      |> Repo.update()
+    else
+      changeset =
+        record
+        |> then(&changeset_fun.(&1, tags))
+        |> Ecto.Changeset.add_error(:tags, "reference unknown tags")
+
+      {:error, changeset}
+    end
+  end
+
+  defp put_tag_names(record, put_fun, tag_names) do
+    with {:ok, tags} <- ensure_tags(normalize_tag_names(tag_names)) do
+      put_fun.(record, Enum.map(tags, & &1.id))
+    end
   end
 
   defp normalize_tag_names(tag_names) do
