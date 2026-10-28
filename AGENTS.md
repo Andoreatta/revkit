@@ -10,10 +10,9 @@ wrappers, encoders). It is a pure-string pipeline: it does **not** execute
 anything. The pure engine (`Revkit.Transform`, `Revkit.Engine.Chain`,
 `Revkit.Engine.Transforms`, `Revkit.Engine.Template`, `Revkit.Engine.Validator`),
 the persistence layer (`Revkit.Catalog`), and the LiveView UI (`GenerateLive`,
-`PayloadLive.*`, `RecipeLive.*`) are in place. `/` still serves the scaffold
-landing page; the product UI starts at `/generate`.
-This file describes the target architecture; update the stale lines as the code
-lands.
+`PayloadLive.*`, `RecipeLive.*`, `TagLive.Index`) are in place. `/` and
+`/generate` both open the generator. This file describes the target architecture;
+update the stale lines as the code lands.
 
 ## Commands
 
@@ -65,12 +64,11 @@ reintroduce ad-hoc lint/type/security commands outside the precommit alias.
 - `RevkitWeb.CoreComponents` — `flash`, `button`, `input`, `table`, `list`,
   `header`, `icon`. `RevkitWeb.Layouts` — `app/1`, `flash_group/1`,
   `theme_toggle/1`, plus `layouts/root.html.heex`.
-- `lib/revkit_web/live/` — `GenerateLive` (`/generate`), `PayloadLive.Index`/
-  `Form` (`/payloads`), `RecipeLive.Index`/`Form` (`/recipes`). GenerateLive's
-  `phx-change` handler must only assign `:preview`: it reads params, resolves
-  recipe keys through `Revkit.Engine.Transforms`, runs `Revkit.Engine.Chain`,
-  and never calls Catalog or assigns form state. CRUD forms are the exception;
-  they own their form assigns.
+- `lib/revkit_web/live/` — `GenerateLive` (`/` and `/generate`), `PayloadLive.Index`/
+  `Form` (`/payloads`), `RecipeLive.Index`/`Form` (`/recipes`), and
+  `TagLive.Index` (`/tags`). GenerateLive's `phx-change` handler updates the
+  template/variable/chain form and `:preview` but never calls Catalog or Repo.
+  CRUD forms own their form assigns.
 - New LiveViews belong in `lib/revkit_web/live/` as `RevkitWeb.XLive`; routes can
   use `live "/x", XLive` because the browser scope is aliased to `RevkitWeb`.
 - `Dockerfile`, `compose.yaml`, `.env.example`, and `docker/entrypoint.sh` — the

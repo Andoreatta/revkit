@@ -20,6 +20,7 @@ no JSON API and no authentication by design.
 - Saved recipe snapshots containing template, variable values, chain, target
   metadata, notes, tags, and favorite status
 - Recipe reopen, fork, search, and payload/recipe search
+- Tag management (create, rename, delete) plus payload/recipe tag assignment
 - Nonce-based Content-Security-Policy
 - Quality gates: Credo, Sobelow, Dialyzer, ExUnit
 
@@ -149,12 +150,12 @@ docker build \
 
 | Path | Purpose |
 |---|---|
-| `/` | Landing page |
-| `/generate` | Generator and live preview |
+| `/`, `/generate` | Generator and live preview |
 | `/payloads` | Payload catalog |
 | `/payloads/new`, `/payloads/:id/edit` | Payload forms |
-| `/recipes` | Recipe catalog |
+| `/recipes` | Saved recipe snapshots |
 | `/recipes/new`, `/recipes/:id/edit` | Recipe forms |
+| `/tags` | Tag curation |
 | `/health` | Container liveness check |
 | `/dev/dashboard` | LiveDashboard, dev only |
 
