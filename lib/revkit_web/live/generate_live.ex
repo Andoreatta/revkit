@@ -29,8 +29,14 @@ defmodule RevkitWeb.GenerateLive do
   @impl true
   def handle_params(params, _uri, socket) do
     payload = payload_from_params(params["payload_id"])
-    recipe = recipe_from_params(params["recipe_id"], payload, socket.assigns.recipes)
-    state = load_state(payload, recipe)
+    recipe = find_recipe(params["recipe_id"], socket.assigns.recipes)
+
+    state =
+      cond do
+        recipe -> load_state(payload, recipe)
+        payload -> load_payload_state(payload)
+        true -> load_state(nil, nil)
+      end
 
     {:noreply,
      assign(socket, state)
@@ -112,18 +118,12 @@ defmodule RevkitWeb.GenerateLive do
       |> Map.put("target_shell", socket.assigns.target[:shell])
       |> Map.put("target_tools", socket.assigns.target[:tools] || [])
 
-    case Catalog.create_recipe(attrs) do
-      {:ok, recipe} ->
-        case Catalog.put_recipe_tag_names(recipe, params["tags"]) do
-          {:ok, _recipe} ->
-            {:noreply,
-             socket
-             |> put_flash(:info, "Recipe saved")
-             |> push_navigate(to: ~p"/recipes")}
-
-          {:error, changeset} ->
-            {:noreply, assign(socket, save_form: to_form(changeset, action: :insert))}
-        end
+    case Catalog.create_recipe_with_tags(attrs, params["tags"]) do
+      {:ok, _recipe} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Recipe saved")
+         |> push_navigate(to: ~p"/recipes")}
 
       {:error, changeset} ->
         {:noreply, assign(socket, save_form: to_form(changeset, action: :insert))}
@@ -146,22 +146,6 @@ defmodule RevkitWeb.GenerateLive do
     }
   end
 
-  defp load_state(%Payload{} = payload, nil) do
-    recipe = payload.recipe
-    template = payload.template || ""
-    variables = if recipe, do: stringify_variables(recipe.variables), else: %{}
-
-    %{
-      template: template,
-      variables: merge_variable_names(template, variables),
-      variable_names: Template.variables(template),
-      steps: to_editor_steps(if recipe, do: recipe.steps, else: []),
-      payload_id: payload.id,
-      recipe_id: recipe && recipe.id,
-      target: target_from_payload(payload)
-    }
-  end
-
   defp load_state(payload, %Recipe{} = recipe) do
     fallback_template =
       loaded_payload_template(recipe.payload) || (payload && payload.template) || ""
@@ -176,6 +160,28 @@ defmodule RevkitWeb.GenerateLive do
       payload_id: recipe.payload_id || (payload && payload.id),
       recipe_id: recipe.id,
       target: target_from_recipe(recipe, payload)
+    }
+  end
+
+  defp load_payload_state(payload) do
+    recipe = payload.recipe
+    template = payload.template || ""
+
+    variables =
+      if recipe && recipe.template in [nil, "", template] do
+        stringify_variables(recipe.variables)
+      else
+        %{}
+      end
+
+    %{
+      template: template,
+      variables: merge_variable_names(template, variables),
+      variable_names: Template.variables(template),
+      steps: to_editor_steps(if recipe, do: recipe.steps, else: []),
+      payload_id: payload.id,
+      recipe_id: recipe && recipe.id,
+      target: target_from_payload(payload)
     }
   end
 
@@ -251,7 +257,7 @@ defmodule RevkitWeb.GenerateLive do
         }
 
       payload ->
-        load_state(payload, payload.recipe)
+        load_payload_state(payload)
     end
   end
 
@@ -360,10 +366,6 @@ defmodule RevkitWeb.GenerateLive do
       {id, ""} -> Catalog.get_payload(id)
       _other -> nil
     end
-  end
-
-  defp recipe_from_params(id, payload, recipes) do
-    find_recipe(id, recipes) || (payload && payload.recipe)
   end
 
   defp find_payload(id, payloads) do

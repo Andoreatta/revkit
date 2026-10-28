@@ -239,6 +239,30 @@ defmodule RevkitWeb.GenerateLiveTest do
     assert html =~ "Snapshot"
   end
 
+  test "payload selection keeps the payload template over its default recipe snapshot", %{
+    conn: conn
+  } do
+    {:ok, recipe} =
+      Catalog.create_recipe(%{
+        name: "Different snapshot",
+        template: "recipe {{HOST}}",
+        variables: %{"HOST" => "recipe"},
+        steps: [%{"key" => "base64_encode", "options" => %{}}]
+      })
+
+    {:ok, payload} =
+      Catalog.create_payload(%{
+        name: "Payload",
+        template: "payload {{HOST}}",
+        recipe_id: recipe.id
+      })
+
+    {:ok, _view, html} = live(conn, ~p"/generate?payload_id=#{payload.id}")
+
+    assert html =~ "payload {{HOST}}"
+    refute html =~ "recipe {{HOST}}"
+  end
+
   test "saves the full generation snapshot as a recipe", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/generate")
 
