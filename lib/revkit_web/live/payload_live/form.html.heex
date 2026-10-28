@@ -18,6 +18,37 @@
       >
         <.input field={@form[:name]} type="text" label="Name" />
         <.input field={@form[:description]} type="text" label="Description" />
+        <.input field={@form[:favorite]} type="checkbox" label="Favorite" />
+
+        <div class="grid gap-2 sm:grid-cols-2">
+          <.input
+            field={@form[:target_os]}
+            type="text"
+            label="Target OS"
+            placeholder="linux, windows, macos"
+          />
+          <.input
+            field={@form[:target_shell]}
+            type="text"
+            label="Target shell"
+            placeholder="bash, sh, powershell"
+          />
+        </div>
+
+        <div class="fieldset mb-2">
+          <label for="payload-target-tools" class="label mb-1">Target tools</label>
+          <input
+            id="payload-target-tools"
+            type="text"
+            name="payload[target_tools_text]"
+            value={@target_tools}
+            placeholder="base64, curl, nc"
+            class="w-full input"
+          />
+          <p class="mt-1 text-xs text-base-content/60">
+            Comma-separated capabilities available on the target.
+          </p>
+        </div>
 
         <.input
           field={@form[:template]}
@@ -28,9 +59,16 @@
         />
 
         <.input
+          field={@form[:notes]}
+          type="textarea"
+          rows="3"
+          label="Notes"
+        />
+
+        <.input
           field={@form[:recipe_id]}
           type="select"
-          label="Recipe"
+          label="Default recipe"
           prompt="No recipe"
           options={Enum.map(@recipes, &{&1.name, &1.id})}
         />

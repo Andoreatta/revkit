@@ -90,6 +90,54 @@ defmodule RevkitWeb.PayloadLiveTest do
     assert Catalog.list_payloads() == []
   end
 
+  test "searches payloads", %{conn: conn} do
+    {:ok, _payload} = Catalog.create_payload(%{name: "Alpha shell", template: "bash -i"})
+    {:ok, _payload} = Catalog.create_payload(%{name: "Beta", template: "nc"})
+
+    {:ok, view, _html} = live(conn, ~p"/payloads")
+
+    html = render_change(view, "search", %{"q" => "alpha"})
+
+    assert html =~ "Alpha shell"
+    refute html =~ "Beta"
+  end
+
+  test "toggles a payload favorite", %{conn: conn} do
+    {:ok, payload} = Catalog.create_payload(%{name: "Favorite", template: "id"})
+
+    {:ok, view, _html} = live(conn, ~p"/payloads")
+
+    render_click(view, "toggle_favorite", %{"id" => to_string(payload.id)})
+
+    assert Catalog.get_payload!(payload.id).favorite == true
+  end
+
+  test "creates a payload with target metadata and notes", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/payloads/new")
+
+    view
+    |> render_submit("save", %{
+      "payload" => %{
+        "name" => "Targeted",
+        "template" => "id",
+        "target_os" => "linux",
+        "target_shell" => "bash",
+        "target_tools_text" => "base64, curl",
+        "notes" => "Requires an interactive shell",
+        "favorite" => "true"
+      }
+    })
+
+    assert_redirect(view, ~p"/payloads")
+
+    payload = Catalog.list_payloads() |> hd()
+    assert payload.target_os == "linux"
+    assert payload.target_shell == "bash"
+    assert payload.target_tools == ["base64", "curl"]
+    assert payload.notes == "Requires an interactive shell"
+    assert payload.favorite == true
+  end
+
   test "links to the generator with the payload id", %{conn: conn} do
     {:ok, payload} = Catalog.create_payload(%{name: "Payload", template: "id"})
 

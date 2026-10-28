@@ -144,6 +144,82 @@ defmodule RevkitWeb.RecipeLiveTest do
     assert Catalog.list_recipes() == []
   end
 
+  test "searches recipes", %{conn: conn} do
+    {:ok, _recipe} = Catalog.create_recipe(%{name: "Linux shell", template: "bash -i"})
+    {:ok, _recipe} = Catalog.create_recipe(%{name: "Other", template: "cmd.exe"})
+
+    {:ok, view, _html} = live(conn, ~p"/recipes")
+
+    html = render_change(view, "search", %{"q" => "linux"})
+
+    assert html =~ "Linux shell"
+    refute html =~ "Other"
+  end
+
+  test "forks a recipe with its snapshot and tags", %{conn: conn} do
+    {:ok, recipe} =
+      Catalog.create_recipe(%{
+        name: "Original",
+        template: "id {{HOST}}",
+        variables: %{"HOST" => "10.0.0.1"},
+        steps: [%{"key" => "base64_encode", "options" => %{}}],
+        notes: "note",
+        target_shell: "bash"
+      })
+
+    {:ok, _recipe} = Catalog.put_recipe_tag_names(recipe, ["unix"])
+
+    {:ok, view, _html} = live(conn, ~p"/recipes")
+
+    render_click(view, "fork", %{"id" => to_string(recipe.id)})
+
+    assert render(view) =~ "Recipe forked"
+    assert length(Catalog.list_recipes()) == 2
+
+    forked = Catalog.list_recipes() |> Enum.find(&(&1.name == "Original (copy)"))
+    assert forked.template == "id {{HOST}}"
+    assert forked.variables == %{"HOST" => "10.0.0.1"}
+    assert forked.steps == [%{"key" => "base64_encode", "options" => %{}}]
+    assert forked.notes == "note"
+    assert forked.target_shell == "bash"
+    assert Enum.map(forked.tags, & &1.name) == ["unix"]
+  end
+
+  test "toggles a recipe favorite", %{conn: conn} do
+    {:ok, recipe} = Catalog.create_recipe(%{name: "Favorite"})
+
+    {:ok, view, _html} = live(conn, ~p"/recipes")
+
+    render_click(view, "toggle_favorite", %{"id" => to_string(recipe.id)})
+
+    assert Catalog.get_recipe!(recipe.id).favorite == true
+  end
+
+  test "recipe form stores template, notes, and tags", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/recipes/new")
+
+    view |> element("#recipe-add-step") |> render_click()
+
+    render_submit(view, "save", %{
+      "recipe" => %{
+        "name" => "Snapshot",
+        "description" => "",
+        "template" => "id {{HOST}}",
+        "notes" => "Keep this",
+        "tags" => "unix",
+        "steps" => %{"0" => %{"key" => "base64_encode"}}
+      }
+    })
+
+    assert_redirect(view, ~p"/recipes")
+
+    recipe = Catalog.list_recipes() |> hd()
+    assert recipe.template == "id {{HOST}}"
+    assert recipe.notes == "Keep this"
+    assert recipe.steps == [%{"key" => "base64_encode", "options" => %{}}]
+    assert Enum.map(recipe.tags, & &1.name) == ["unix"]
+  end
+
   test "links to the generator with the recipe id", %{conn: conn} do
     {:ok, recipe} = Catalog.create_recipe(%{name: "Chain"})
 

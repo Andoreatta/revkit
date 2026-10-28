@@ -1,25 +1,38 @@
 <Layouts.app flash={@flash}>
   <.header>
     Recipes
-    <:subtitle>Ordered transform chains that can be applied to any payload.</:subtitle>
+    <:subtitle>Saved generation snapshots: template, variables, chain, and notes.</:subtitle>
     <:actions>
       <.button variant="primary" navigate={~p"/recipes/new"}>New recipe</.button>
     </:actions>
   </.header>
 
+  <form id="recipe-search" phx-change="search" phx-debounce="250" class="mb-4">
+    <input
+      type="search"
+      name="q"
+      value={@query}
+      placeholder="Search recipes by name, template, or notes"
+      class="w-full input"
+    />
+  </form>
+
   <div :if={@recipes == []} class="card bg-base-100 shadow-sm">
     <div class="card-body items-center text-center">
-      <p class="text-base-content/70">No recipes yet.</p>
-      <.button navigate={~p"/recipes/new"}>Create the first recipe</.button>
+      <p class="text-base-content/70">
+        {if @query == "", do: "No recipes yet.", else: "No recipes match your search."}
+      </p>
+      <.button :if={@query == ""} navigate={~p"/recipes/new"}>Create the first recipe</.button>
     </div>
   </div>
 
   <.table :if={@recipes != []} id="recipes" rows={@recipes}>
     <:col :let={recipe} label="Name">
       <div class="font-medium">{recipe.name}</div>
-      <div :if={recipe.description} class="text-xs text-base-content/60">
-        {recipe.description}
-      </div>
+      <div :if={recipe.notes} class="text-xs text-base-content/60">{recipe.notes}</div>
+    </:col>
+    <:col :let={recipe} label="Template">
+      <code class="text-xs">{recipe.template}</code>
     </:col>
     <:col :let={recipe} label="Chain">
       <div class="flex flex-wrap gap-1">
@@ -36,11 +49,43 @@
         <span :if={@chains[recipe.id] == []} class="text-base-content/50">—</span>
       </div>
     </:col>
-    <:col :let={recipe} label="Steps">{length(recipe.steps)}</:col>
+    <:col :let={recipe} label="Target">
+      {[recipe.target_os, recipe.target_shell] |> Enum.reject(&is_nil/1) |> Enum.join(" / ")}
+      <span :if={recipe.target_tools != []} class="text-xs text-base-content/60">
+        · {Enum.join(recipe.target_tools, ", ")}
+      </span>
+    </:col>
+    <:col :let={recipe} label="Tags">
+      <div class="flex flex-wrap gap-1">
+        <span :for={tag <- recipe.tags} class="badge badge-ghost badge-sm">{tag.name}</span>
+        <span :if={recipe.tags == []} class="text-base-content/50">—</span>
+      </div>
+    </:col>
     <:action :let={recipe}>
+      <button
+        type="button"
+        class="btn btn-ghost btn-xs"
+        phx-click="toggle_favorite"
+        phx-value-id={recipe.id}
+        aria-label={if recipe.favorite, do: "Unfavorite", else: "Favorite"}
+      >
+        <.icon
+          name={if recipe.favorite, do: "hero-star-solid", else: "hero-star"}
+          class="size-4"
+        />
+      </button>
       <.link navigate={~p"/generate?recipe_id=#{recipe.id}"} class="btn btn-ghost btn-xs">
-        Generate
+        Open
       </.link>
+      <button
+        type="button"
+        class="btn btn-ghost btn-xs"
+        phx-click="fork"
+        phx-value-id={recipe.id}
+        data-confirm="Fork this recipe?"
+      >
+        Fork
+      </button>
       <.link navigate={~p"/recipes/#{recipe.id}/edit"} class="btn btn-ghost btn-xs">
         Edit
       </.link>

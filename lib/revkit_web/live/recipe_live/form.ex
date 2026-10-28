@@ -21,6 +21,7 @@ defmodule RevkitWeb.RecipeLive.Form do
     socket
     |> assign(:recipe, recipe)
     |> assign(:steps, [])
+    |> assign(:tag_names, "")
     |> assign(:form, to_form(Recipe.changeset(recipe, %{})))
   end
 
@@ -30,6 +31,7 @@ defmodule RevkitWeb.RecipeLive.Form do
     socket
     |> assign(:recipe, recipe)
     |> assign(:steps, Enum.map(recipe.steps, &to_editor_step/1))
+    |> assign(:tag_names, Enum.map_join(recipe.tags, ", ", & &1.name))
     |> assign(:form, to_form(Recipe.changeset(recipe, %{})))
   end
 
@@ -50,7 +52,12 @@ defmodule RevkitWeb.RecipeLive.Form do
       |> Recipe.changeset(attrs(params, steps))
       |> Map.put(:action, :validate)
 
-    {:noreply, assign(socket, form: to_form(changeset), steps: steps)}
+    {:noreply,
+     assign(socket,
+       form: to_form(changeset),
+       steps: steps,
+       tag_names: Map.get(params, "tags", socket.assigns.tag_names)
+     )}
   end
 
   @impl true
@@ -88,15 +95,20 @@ defmodule RevkitWeb.RecipeLive.Form do
   @impl true
   def handle_event("save", %{"recipe" => params}, socket) do
     steps = merge_steps(socket.assigns.steps, params["steps"])
-    recipe_attrs = attrs(params, steps)
+    result = save_recipe(socket, attrs(params, steps))
 
-    result =
-      case socket.assigns.live_action do
-        :new -> Catalog.create_recipe(recipe_attrs)
-        :edit -> Catalog.update_recipe(socket.assigns.recipe, recipe_attrs)
-      end
+    handle_save_result(socket, result, params, steps)
+  end
 
-    case result do
+  defp save_recipe(socket, recipe_attrs) do
+    case socket.assigns.live_action do
+      :new -> Catalog.create_recipe(recipe_attrs)
+      :edit -> Catalog.update_recipe(socket.assigns.recipe, recipe_attrs)
+    end
+  end
+
+  defp handle_save_result(socket, {:ok, recipe}, params, steps) do
+    case Catalog.put_recipe_tag_names(recipe, params["tags"]) do
       {:ok, _recipe} ->
         {:noreply,
          socket
@@ -104,10 +116,21 @@ defmodule RevkitWeb.RecipeLive.Form do
          |> push_navigate(to: ~p"/recipes")}
 
       {:error, changeset} ->
-        action = if socket.assigns.live_action == :new, do: :insert, else: :update
-
-        {:noreply, assign(socket, form: to_form(changeset, action: action), steps: steps)}
+        {:noreply, save_error(socket, changeset, :update, params, steps)}
     end
+  end
+
+  defp handle_save_result(socket, {:error, changeset}, params, steps) do
+    action = if socket.assigns.live_action == :new, do: :insert, else: :update
+    {:noreply, save_error(socket, changeset, action, params, steps)}
+  end
+
+  defp save_error(socket, changeset, action, params, steps) do
+    assign(socket,
+      form: to_form(changeset, action: action),
+      steps: steps,
+      tag_names: params["tags"] || ""
+    )
   end
 
   defp merge_steps(steps, step_params) when is_map(step_params) do

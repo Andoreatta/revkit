@@ -7,10 +7,22 @@
     </:actions>
   </.header>
 
+  <form id="payload-search" phx-change="search" phx-debounce="250" class="mb-4">
+    <input
+      type="search"
+      name="q"
+      value={@query}
+      placeholder="Search payloads by name, description, or template"
+      class="w-full input"
+    />
+  </form>
+
   <div :if={@payloads == []} class="card bg-base-100 shadow-sm">
     <div class="card-body items-center text-center">
-      <p class="text-base-content/70">No payloads yet.</p>
-      <.button navigate={~p"/payloads/new"}>Create the first payload</.button>
+      <p class="text-base-content/70">
+        {if @query == "", do: "No payloads yet.", else: "No payloads match your search."}
+      </p>
+      <.button :if={@query == ""} navigate={~p"/payloads/new"}>Create the first payload</.button>
     </div>
   </div>
 
@@ -20,6 +32,12 @@
       <div :if={payload.description} class="text-xs text-base-content/60">
         {payload.description}
       </div>
+    </:col>
+    <:col :let={payload} label="Target">
+      {[payload.target_os, payload.target_shell] |> Enum.reject(&is_nil/1) |> Enum.join(" / ")}
+      <span :if={payload.target_tools != []} class="text-xs text-base-content/60">
+        · {Enum.join(payload.target_tools, ", ")}
+      </span>
     </:col>
     <:col :let={payload} label="Recipe">
       {if payload.recipe, do: payload.recipe.name, else: "—"}
@@ -31,6 +49,18 @@
       </div>
     </:col>
     <:action :let={payload}>
+      <button
+        type="button"
+        class="btn btn-ghost btn-xs"
+        phx-click="toggle_favorite"
+        phx-value-id={payload.id}
+        aria-label={if payload.favorite, do: "Unfavorite", else: "Favorite"}
+      >
+        <.icon
+          name={if payload.favorite, do: "hero-star-solid", else: "hero-star"}
+          class="size-4"
+        />
+      </button>
       <.link navigate={~p"/generate?payload_id=#{payload.id}"} class="btn btn-ghost btn-xs">
         Generate
       </.link>

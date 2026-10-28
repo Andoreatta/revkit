@@ -20,6 +20,7 @@ defmodule RevkitWeb.PayloadLive.Form do
     socket
     |> assign(:payload, payload)
     |> assign(:tag_names, "")
+    |> assign(:target_tools, "")
     |> assign(:form, to_form(Payload.changeset(payload, %{})))
   end
 
@@ -29,20 +30,24 @@ defmodule RevkitWeb.PayloadLive.Form do
     socket
     |> assign(:payload, payload)
     |> assign(:tag_names, Enum.map_join(payload.tags, ", ", & &1.name))
+    |> assign(:target_tools, Enum.join(payload.target_tools, ", "))
     |> assign(:form, to_form(Payload.changeset(payload, %{})))
   end
 
   @impl true
   def handle_event("validate", %{"payload" => params}, socket) do
+    attrs = normalize_params(params)
+
     changeset =
       socket.assigns.payload
-      |> Payload.changeset(params)
+      |> Payload.changeset(attrs)
       |> Map.put(:action, :validate)
 
     {:noreply,
      assign(socket,
        form: to_form(changeset),
-       tag_names: Map.get(params, "tags", socket.assigns.tag_names)
+       tag_names: Map.get(params, "tags", socket.assigns.tag_names),
+       target_tools: Map.get(params, "target_tools_text", socket.assigns.target_tools)
      )}
   end
 
@@ -52,7 +57,9 @@ defmodule RevkitWeb.PayloadLive.Form do
   end
 
   defp save_payload(socket, :new, params) do
-    case Catalog.create_payload_with_tags(params, params["tags"]) do
+    attrs = normalize_params(params)
+
+    case Catalog.create_payload_with_tags(attrs, params["tags"]) do
       {:ok, _payload} ->
         {:noreply,
          socket
@@ -63,13 +70,16 @@ defmodule RevkitWeb.PayloadLive.Form do
         {:noreply,
          assign(socket,
            form: to_form(changeset, action: :insert),
-           tag_names: params["tags"] || ""
+           tag_names: params["tags"] || "",
+           target_tools: params["target_tools_text"] || ""
          )}
     end
   end
 
   defp save_payload(socket, :edit, params) do
-    case Catalog.update_payload_with_tags(socket.assigns.payload, params, params["tags"]) do
+    attrs = normalize_params(params)
+
+    case Catalog.update_payload_with_tags(socket.assigns.payload, attrs, params["tags"]) do
       {:ok, _payload} ->
         {:noreply,
          socket
@@ -80,8 +90,23 @@ defmodule RevkitWeb.PayloadLive.Form do
         {:noreply,
          assign(socket,
            form: to_form(changeset, action: :update),
-           tag_names: params["tags"] || ""
+           tag_names: params["tags"] || "",
+           target_tools: params["target_tools_text"] || ""
          )}
     end
+  end
+
+  defp normalize_params(params) do
+    tools =
+      params
+      |> Map.get("target_tools_text", "")
+      |> String.split(",")
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.uniq()
+
+    params
+    |> Map.delete("target_tools_text")
+    |> Map.put("target_tools", tools)
   end
 end
