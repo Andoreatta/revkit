@@ -37,7 +37,7 @@ defmodule RevkitWeb.Layouts do
     ~H"""
     <header class="navbar border-b border-base-300 px-4 sm:px-6 lg:px-8">
       <div class="flex-1">
-        <a href={~p"/generate"} class="flex w-fit items-center gap-2">
+        <a href={~p"/"} class="flex w-fit items-center gap-2">
           <img src={~p"/images/logo.svg"} width="32" alt="Revkit" />
           <span class="text-sm font-semibold">Revkit</span>
         </a>
@@ -52,6 +52,9 @@ defmodule RevkitWeb.Layouts do
           </li>
           <li>
             <.link navigate={~p"/recipes"} class="btn btn-ghost btn-sm">Recipes</.link>
+          </li>
+          <li>
+            <.link navigate={~p"/tags"} class="btn btn-ghost btn-sm">Tags</.link>
           </li>
           <li>
             <.theme_toggle />

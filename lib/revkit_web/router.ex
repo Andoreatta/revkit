@@ -17,9 +17,9 @@ defmodule RevkitWeb.Router do
   scope "/", RevkitWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
     get "/health", HealthController, :index
 
+    live "/", GenerateLive, :index
     live "/generate", GenerateLive, :index
 
     live "/payloads", PayloadLive.Index, :index
@@ -29,6 +29,8 @@ defmodule RevkitWeb.Router do
     live "/recipes", RecipeLive.Index, :index
     live "/recipes/new", RecipeLive.Form, :new
     live "/recipes/:id/edit", RecipeLive.Form, :edit
+
+    live "/tags", TagLive.Index, :index
   end
 
   # Enable LiveDashboard in development

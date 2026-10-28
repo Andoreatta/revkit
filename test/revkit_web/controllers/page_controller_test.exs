@@ -3,7 +3,7 @@ defmodule RevkitWeb.PageControllerTest do
 
   test "GET /", %{conn: conn} do
     conn = get(conn, ~p"/")
-    assert html_response(conn, 200) =~ "Peace of mind from prototype to production"
+    assert html_response(conn, 200) =~ "Generate payload"
   end
 
   test "sets a nonce-based Content-Security-Policy", %{conn: conn} do
