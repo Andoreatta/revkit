@@ -108,25 +108,64 @@ defmodule Revkit.Catalog do
 
   ## Recipes
 
-  @doc "Lists recipes ordered by name."
+  @doc "Lists recipes ordered by name, with tags and source payload preloaded."
   def list_recipes do
-    Repo.all(from recipe in Recipe, order_by: [asc: recipe.name])
+    Repo.all(
+      from recipe in Recipe,
+        order_by: [asc: recipe.name],
+        preload: [:tags, :payload]
+    )
   end
 
-  @doc "Gets a recipe, or `nil`."
-  def get_recipe(id), do: Repo.get(Recipe, id)
+  @doc "Searches payloads by name, description, or template."
+  def search_payloads(query) when is_binary(query) and query != "" do
+    pattern = "%" <> String.downcase(String.trim(query)) <> "%"
 
-  @doc "Gets a recipe, or raises."
-  def get_recipe!(id), do: Repo.get!(Recipe, id)
+    Repo.all(
+      from payload in Payload,
+        where:
+          fragment("LOWER(?) LIKE ?", payload.name, ^pattern) or
+            fragment("LOWER(?) LIKE ?", payload.description, ^pattern) or
+            fragment("LOWER(?) LIKE ?", payload.template, ^pattern),
+        order_by: [asc: payload.name],
+        preload: [:tags, :recipe]
+    )
+  end
 
-  @doc "Creates a recipe."
+  def search_payloads(_query), do: list_payloads()
+
+  @doc "Searches recipes by name, description, template, or notes."
+  def search_recipes(query) when is_binary(query) and query != "" do
+    pattern = "%" <> String.downcase(String.trim(query)) <> "%"
+
+    Repo.all(
+      from recipe in Recipe,
+        where:
+          fragment("LOWER(?) LIKE ?", recipe.name, ^pattern) or
+            fragment("LOWER(?) LIKE ?", recipe.description, ^pattern) or
+            fragment("LOWER(?) LIKE ?", recipe.template, ^pattern) or
+            fragment("LOWER(?) LIKE ?", recipe.notes, ^pattern),
+        order_by: [asc: recipe.name],
+        preload: [:tags, :payload]
+    )
+  end
+
+  def search_recipes(_query), do: list_recipes()
+
+  @doc "Gets a recipe with tags and source payload preloaded, or `nil`."
+  def get_recipe(id), do: Repo.get(Recipe, id) |> preload_recipe()
+
+  @doc "Gets a recipe with tags and source payload preloaded, or raises."
+  def get_recipe!(id), do: Repo.get!(Recipe, id) |> preload_recipe()
+
+  @doc "Creates a recipe snapshot."
   def create_recipe(attrs \\ %{}) do
     %Recipe{}
     |> Recipe.changeset(attrs)
     |> Repo.insert()
   end
 
-  @doc "Updates a recipe."
+  @doc "Updates a recipe snapshot."
   def update_recipe(%Recipe{} = recipe, attrs) do
     recipe
     |> Recipe.changeset(attrs)
@@ -139,6 +178,71 @@ defmodule Revkit.Catalog do
   @doc "Returns a changeset for tracking recipe changes."
   def change_recipe(%Recipe{} = recipe, attrs \\ %{}) do
     Recipe.changeset(recipe, attrs)
+  end
+
+  @doc """
+  Copies a saved generation snapshot, including steps, variables, target
+  metadata, notes, and tags.
+  """
+  def fork_recipe(%Recipe{} = recipe) do
+    recipe = Repo.preload(recipe, :tags)
+
+    attrs =
+      recipe
+      |> Map.take([
+        :description,
+        :template,
+        :variables,
+        :steps,
+        :notes,
+        :favorite,
+        :target_os,
+        :target_shell,
+        :target_tools,
+        :payload_id
+      ])
+      |> Map.put(:name, "#{recipe.name} (copy)")
+
+    with {:ok, forked} <- %Recipe{} |> Recipe.changeset(attrs) |> Repo.insert() do
+      put_recipe_tags(forked, Enum.map(recipe.tags, & &1.id))
+    end
+  end
+
+  @doc "Replaces a recipe's tags with the tags identified by `tag_ids`."
+  def put_recipe_tags(%Recipe{} = recipe, tag_ids) when is_list(tag_ids) do
+    tag_ids = Enum.uniq(tag_ids)
+    tags = Repo.all(from tag in Tag, where: tag.id in ^tag_ids)
+    recipe = Repo.preload(recipe, :tags)
+
+    if length(tags) == length(tag_ids) do
+      recipe
+      |> Recipe.tags_changeset(tags)
+      |> Repo.update()
+    else
+      changeset =
+        recipe
+        |> Recipe.tags_changeset(tags)
+        |> Ecto.Changeset.add_error(:tags, "reference unknown tags")
+
+      {:error, changeset}
+    end
+  end
+
+  @doc "Replaces a recipe's tags with tags found or created by name."
+  def put_recipe_tag_names(%Recipe{} = recipe, tag_names) do
+    with {:ok, tags} <- ensure_tags(normalize_tag_names(tag_names)) do
+      put_recipe_tags(recipe, Enum.map(tags, & &1.id))
+    end
+  end
+
+  @doc "Toggles a payload's favorite flag."
+  def toggle_payload_favorite(%Payload{} = payload) do
+    update_payload(payload, %{favorite: not payload.favorite})
+  end
+
+  @doc "Toggles a recipe's favorite flag."
+  def toggle_recipe_favorite(%Recipe{} = recipe) do
+    update_recipe(recipe, %{favorite: not recipe.favorite})
   end
 
   ## Tags
@@ -216,4 +320,7 @@ defmodule Revkit.Catalog do
 
   defp preload_payload(nil), do: nil
   defp preload_payload(payload), do: Repo.preload(payload, [:tags, :recipe])
+
+  defp preload_recipe(nil), do: nil
+  defp preload_recipe(recipe), do: Repo.preload(recipe, [:tags, :payload])
 end

@@ -15,8 +15,14 @@ defmodule Revkit.Catalog.Payload do
     field :name, :string
     field :description, :string
     field :template, :string
+    field :target_os, :string
+    field :target_shell, :string
+    field :target_tools, {:array, :string}, default: []
+    field :notes, :string
+    field :favorite, :boolean, default: false
 
     belongs_to :recipe, Recipe
+    has_many :recipes, Recipe, foreign_key: :payload_id
     many_to_many :tags, Tag, join_through: "payloads_tags", on_replace: :delete
 
     timestamps(type: :utc_datetime)
@@ -25,7 +31,17 @@ defmodule Revkit.Catalog.Payload do
   @doc false
   def changeset(payload, attrs) do
     payload
-    |> cast(attrs, [:name, :description, :template, :recipe_id])
+    |> cast(attrs, [
+      :name,
+      :description,
+      :template,
+      :recipe_id,
+      :target_os,
+      :target_shell,
+      :target_tools,
+      :notes,
+      :favorite
+    ])
     |> validate_required([:name, :template])
     |> validate_length(:name, min: 1, max: 120)
     |> validate_length(:description, max: 500)
