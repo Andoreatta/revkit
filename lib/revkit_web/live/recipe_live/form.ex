@@ -22,6 +22,7 @@ defmodule RevkitWeb.RecipeLive.Form do
     |> assign(:recipe, recipe)
     |> assign(:steps, [])
     |> assign(:tag_names, "")
+    |> assign(:target_tools, "")
     |> assign(:form, to_form(Recipe.changeset(recipe, %{})))
   end
 
@@ -32,6 +33,7 @@ defmodule RevkitWeb.RecipeLive.Form do
     |> assign(:recipe, recipe)
     |> assign(:steps, Enum.map(recipe.steps, &to_editor_step/1))
     |> assign(:tag_names, Enum.map_join(recipe.tags, ", ", & &1.name))
+    |> assign(:target_tools, Enum.join(recipe.target_tools, ", "))
     |> assign(:form, to_form(Recipe.changeset(recipe, %{})))
   end
 
@@ -56,7 +58,8 @@ defmodule RevkitWeb.RecipeLive.Form do
      assign(socket,
        form: to_form(changeset),
        steps: steps,
-       tag_names: Map.get(params, "tags", socket.assigns.tag_names)
+       tag_names: Map.get(params, "tags", socket.assigns.tag_names),
+       target_tools: Map.get(params, "target_tools_text", socket.assigns.target_tools)
      )}
   end
 
@@ -95,29 +98,23 @@ defmodule RevkitWeb.RecipeLive.Form do
   @impl true
   def handle_event("save", %{"recipe" => params}, socket) do
     steps = merge_steps(socket.assigns.steps, params["steps"])
-    result = save_recipe(socket, attrs(params, steps))
+    result = save_recipe(socket, attrs(params, steps), params["tags"])
 
     handle_save_result(socket, result, params, steps)
   end
 
-  defp save_recipe(socket, recipe_attrs) do
+  defp save_recipe(socket, recipe_attrs, tag_names) do
     case socket.assigns.live_action do
-      :new -> Catalog.create_recipe(recipe_attrs)
-      :edit -> Catalog.update_recipe(socket.assigns.recipe, recipe_attrs)
+      :new -> Catalog.create_recipe_with_tags(recipe_attrs, tag_names)
+      :edit -> Catalog.update_recipe_with_tags(socket.assigns.recipe, recipe_attrs, tag_names)
     end
   end
 
-  defp handle_save_result(socket, {:ok, recipe}, params, steps) do
-    case Catalog.put_recipe_tag_names(recipe, params["tags"]) do
-      {:ok, _recipe} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Recipe saved")
-         |> push_navigate(to: ~p"/recipes")}
-
-      {:error, changeset} ->
-        {:noreply, save_error(socket, changeset, :update, params, steps)}
-    end
+  defp handle_save_result(socket, {:ok, _recipe}, _params, _steps) do
+    {:noreply,
+     socket
+     |> put_flash(:info, "Recipe saved")
+     |> push_navigate(to: ~p"/recipes")}
   end
 
   defp handle_save_result(socket, {:error, changeset}, params, steps) do
@@ -129,7 +126,8 @@ defmodule RevkitWeb.RecipeLive.Form do
     assign(socket,
       form: to_form(changeset, action: action),
       steps: steps,
-      tag_names: params["tags"] || ""
+      tag_names: params["tags"] || "",
+      target_tools: params["target_tools_text"] || ""
     )
   end
 
@@ -147,7 +145,18 @@ defmodule RevkitWeb.RecipeLive.Form do
   defp merge_steps(steps, _step_params), do: steps
 
   defp attrs(params, steps) do
-    Map.put(params, "steps", Enum.map(steps, &step_attrs/1))
+    tools =
+      params
+      |> Map.get("target_tools_text", "")
+      |> String.split(",")
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.uniq()
+
+    params
+    |> Map.delete("target_tools_text")
+    |> Map.put("target_tools", tools)
+    |> Map.put("steps", Enum.map(steps, &step_attrs/1))
   end
 
   defp step_attrs(step) do

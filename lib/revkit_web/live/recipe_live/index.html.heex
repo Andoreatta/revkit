@@ -3,7 +3,7 @@
     Recipes
     <:subtitle>Saved generation snapshots: template, variables, chain, and notes.</:subtitle>
     <:actions>
-      <.button variant="primary" navigate={~p"/recipes/new"}>New recipe</.button>
+      <.button variant="primary" navigate={~p"/generate"}>New recipe</.button>
     </:actions>
   </.header>
 
@@ -22,7 +22,7 @@
       <p class="text-base-content/70">
         {if @query == "", do: "No recipes yet.", else: "No recipes match your search."}
       </p>
-      <.button :if={@query == ""} navigate={~p"/recipes/new"}>Create the first recipe</.button>
+      <.button :if={@query == ""} navigate={~p"/generate"}>Create the first recipe</.button>
     </div>
   </div>
 
