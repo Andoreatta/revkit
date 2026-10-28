@@ -100,6 +100,16 @@ defmodule Revkit.Catalog do
     )
   end
 
+  @doc "Returns the most recently updated recipes, newest first."
+  def list_recent_recipes(limit \\ 5) do
+    Repo.all(
+      from recipe in Recipe,
+        order_by: [desc: recipe.updated_at, asc: recipe.name],
+        limit: ^limit,
+        preload: [:tags, :payload]
+    )
+  end
+
   @doc "Searches payloads by name, description, or template."
   def search_payloads(query) when is_binary(query) and query != "" do
     pattern = "%" <> String.downcase(String.trim(query)) <> "%"

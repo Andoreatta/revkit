@@ -14,6 +14,7 @@ defmodule RevkitWeb.GenerateLive do
     {:ok,
      assign(socket,
        recipes: Catalog.list_recipes(),
+       recent_recipes: Catalog.list_recent_recipes(),
        payloads: Catalog.list_payloads(),
        template: "",
        variables: %{},
