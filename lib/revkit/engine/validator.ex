@@ -12,21 +12,78 @@ defmodule Revkit.Engine.Validator do
   @typedoc "A transform warning, with the transforms that raised it."
   @type pitfall :: %{message: String.t(), transforms: [module()]}
 
-  @type report :: %{requires: [requirement()], pitfalls: [pitfall()]}
+  @type warning :: %{type: :unknown_target | :missing_requirement, message: String.t()}
+
+  @type target :: %{
+          optional(:os) => String.t() | nil,
+          optional(:shell) => String.t() | nil,
+          optional(:tools) => [String.t()]
+        }
+
+  @type report :: %{
+          requires: [requirement()],
+          pitfalls: [pitfall()],
+          warnings: [warning()],
+          compatible: boolean()
+        }
 
   @doc """
-  Builds a report from a resolved transform chain (`[{module, options}]`).
-
-  Entries are de-duplicated in first-seen order. Source modules are also
-  de-duplicated, so applying the same transform twice does not duplicate its
-  warning sources.
+  Builds a report from a resolved transform chain and the payload's target
+  metadata. Requirements are compared case-insensitively against the declared
+  OS, shell, and tools; no target probing or execution is performed.
   """
-  @spec validate([{module(), map()}]) :: report()
-  def validate(chain) when is_list(chain) do
+  @spec validate([{module(), map()}], target()) :: report()
+  def validate(chain, target \\ %{}) when is_list(chain) do
+    requires = collect(chain, :requires, :name)
+    pitfalls = collect(chain, :pitfalls, :message)
+    warnings = compatibility_warnings(requires, target)
+
     %{
-      requires: collect(chain, :requires, :name),
-      pitfalls: collect(chain, :pitfalls, :message)
+      requires: requires,
+      pitfalls: pitfalls,
+      warnings: warnings,
+      compatible: warnings == []
     }
+  end
+
+  defp compatibility_warnings(requires, target) do
+    capabilities = capabilities(target)
+
+    Enum.flat_map(requires, fn %{name: name} ->
+      cond do
+        capabilities == [] ->
+          [
+            %{
+              type: :unknown_target,
+              message: "Cannot verify \"#{name}\": target metadata is missing."
+            }
+          ]
+
+        Enum.any?(capabilities, &(String.downcase(&1) == String.downcase(name))) ->
+          []
+
+        true ->
+          [
+            %{
+              type: :missing_requirement,
+              message: "Requires \"#{name}\", but the target metadata does not declare it."
+            }
+          ]
+      end
+    end)
+  end
+
+  defp capabilities(target) do
+    tools = Map.get(target, :tools, Map.get(target, "tools", [])) |> List.wrap()
+
+    [
+      Map.get(target, :os, Map.get(target, "os")),
+      Map.get(target, :shell, Map.get(target, "shell")) | tools
+    ]
+    |> List.wrap()
+    |> Enum.filter(&is_binary/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.uniq()
   end
 
   defp collect(chain, callback, key) do

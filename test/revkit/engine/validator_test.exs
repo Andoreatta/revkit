@@ -5,7 +5,41 @@ defmodule Revkit.Engine.ValidatorTest do
   alias Revkit.Engine.Validator
 
   test "returns an empty report for an empty chain" do
-    assert Validator.validate([]) == %{requires: [], pitfalls: []}
+    assert Validator.validate([]) == %{
+             requires: [],
+             pitfalls: [],
+             warnings: [],
+             compatible: true
+           }
+  end
+
+  test "accepts matching target capabilities" do
+    report = Validator.validate([{BashWrapper, %{}}], %{os: "linux", shell: "bash"})
+
+    assert report.compatible == true
+    assert report.warnings == []
+  end
+
+  test "warns when the target metadata is missing" do
+    report = Validator.validate([{BashWrapper, %{}}])
+
+    assert report.compatible == false
+    assert [%{type: :unknown_target}] = report.warnings
+  end
+
+  test "warns when a requirement is not declared by the target" do
+    report = Validator.validate([{BashWrapper, %{}}], %{os: "linux", shell: "sh"})
+
+    assert report.compatible == false
+    assert [%{type: :missing_requirement, message: message}] = report.warnings
+    assert message =~ "bash"
+  end
+
+  test "accepts a requirement declared as a target tool" do
+    report = Validator.validate([{BashWrapper, %{}}], %{tools: ["bash"]})
+
+    assert report.compatible == true
+    assert report.warnings == []
   end
 
   test "collects requirements with their source transforms" do
