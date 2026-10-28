@@ -25,6 +25,21 @@ defmodule Revkit.Release do
       Ecto.Migrator.with_repo(repo, &Ecto.Migrator.run(&1, :down, to: version), pool_size: 1)
   end
 
+  def seed do
+    load_app()
+
+    for repo <- repos() do
+      {:ok, _, _} =
+        Ecto.Migrator.with_repo(repo, fn _repo -> Code.require_file(seeds_path()) end,
+          pool_size: 1
+        )
+    end
+  end
+
+  defp seeds_path do
+    Path.join(to_string(:code.priv_dir(@app)), "repo/seeds.exs")
+  end
+
   defp repos do
     Application.fetch_env!(@app, :ecto_repos)
   end
