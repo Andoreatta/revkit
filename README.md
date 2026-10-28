@@ -13,8 +13,7 @@ This is an individual course project for Software Development I and II.
 
 ## Status
 
-- **Part I — Documentation:** Functional and Non-Functional Requirements, Use
-  Case Diagram, ERD, and supporting diagrams are referenced below.
+- **Part I — Documentation:** available in the [PDF](docs/documentacao.pdf).
 - **Part II — Implementation:** working Phoenix/LiveView application, verified
   with `mix precommit`, and packaged for Docker.
 
@@ -91,7 +90,8 @@ docker compose down -v  # deletes the volume
   sequence, and deployment (Portuguese labels).
 
 The PDF contains the Functional and Non-Functional Requirements, the Use Case
-Diagram, the ERD, and the supporting diagrams.
+Diagram, the ERD, and the supporting diagrams. Regenerate the diagrams and PDF
+with `./docs/build.sh`.
 
 ## Defense videos
 

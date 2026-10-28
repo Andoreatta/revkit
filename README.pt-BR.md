@@ -15,8 +15,7 @@ fluxo puramente textual: nada é executado.
 
 ## Status
 
-- **Parte I — Documentação:** Requisitos Funcionais e Não Funcionais, Diagrama
-  de Caso de Uso, DER e demais diagramas referenciados abaixo.
+- **Parte I — Documentação:** disponível no [PDF](docs/documentacao.pdf).
 - **Parte II — Implementação:** aplicação Phoenix/LiveView funcional, verificada
   com `mix precommit` e empacotada para Docker.
 
@@ -94,7 +93,8 @@ docker compose down -v  # apaga o volume
   sequência e implantação.
 
 O PDF contém os Requisitos Funcionais e Não Funcionais, o Diagrama de Caso de
-Uso, o DER e os demais diagramas de apoio.
+Uso, o DER e os demais diagramas de apoio. Regenere os diagramas e o PDF com
+`./docs/build.sh`.
 
 ## Vídeos de defesa
 
