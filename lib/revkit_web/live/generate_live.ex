@@ -22,7 +22,7 @@ defmodule RevkitWeb.GenerateLive do
     payload = payload_from_params(params["payload_id"])
     recipe = recipe_from_params(params["recipe_id"], payload, socket.assigns.recipes)
 
-    template = if payload, do: payload.template, else: socket.assigns.template
+    template = if payload, do: payload.template, else: ""
     recipe_id = recipe && recipe.id
 
     {:noreply,

@@ -13,6 +13,7 @@ defmodule Revkit.Engine.TransformsTest do
     assert Transforms.fetch("url_encode") == UrlEncode
     assert Transforms.fetch(:unknown) == nil
     assert Transforms.fetch("unknown") == nil
+    assert Transforms.fetch(nil) == nil
   end
 
   test "resolve/1 preserves order and options" do

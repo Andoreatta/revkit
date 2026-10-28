@@ -88,12 +88,12 @@ defmodule RevkitWeb.RecipeLive.Form do
   @impl true
   def handle_event("save", %{"recipe" => params}, socket) do
     steps = merge_steps(socket.assigns.steps, params["steps"])
-    attrs = attrs(params, steps)
+    recipe_attrs = attrs(params, steps)
 
     result =
       case socket.assigns.live_action do
-        :new -> Catalog.create_recipe(attrs)
-        :edit -> Catalog.update_recipe(socket.assigns.recipe, attrs)
+        :new -> Catalog.create_recipe(recipe_attrs)
+        :edit -> Catalog.update_recipe(socket.assigns.recipe, recipe_attrs)
       end
 
     case result do

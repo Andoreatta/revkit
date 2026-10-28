@@ -23,6 +23,8 @@ defmodule Revkit.Engine.Transforms do
     Enum.find(@transforms, &(Atom.to_string(&1.key()) == key))
   end
 
+  def fetch(_key), do: nil
+
   @doc """
   Resolves stored recipe steps into `{module, options}` pairs for `Chain.run/2`.
 
