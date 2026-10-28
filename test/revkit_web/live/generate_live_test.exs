@@ -5,6 +5,12 @@ defmodule RevkitWeb.GenerateLiveTest do
 
   alias Revkit.Catalog
 
+  test "renders the generator at the root route", %{conn: conn} do
+    {:ok, _view, html} = live(conn, ~p"/")
+
+    assert html =~ "Generate payload"
+  end
+
   test "renders the generator with recipes", %{conn: conn} do
     {:ok, _recipe} =
       Catalog.create_recipe(%{
