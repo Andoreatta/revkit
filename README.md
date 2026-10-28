@@ -9,11 +9,17 @@ no JSON API and no authentication by design.
 
 ## Features
 
-- Generate previews from a payload template and an ordered transform recipe
+- Payload templates with `{{NAME}}` variables and live substitution
+- Ordered transform chains with live preview
 - Built-in transforms: Base64 encode, URL encode, Bash wrapper
-- Chain validation with target requirements and transform pitfalls
+- Target metadata (`target_os`, `target_shell`, `target_tools`) with
+  compatibility warnings for transform requirements
+- Transform pitfalls surfaced before the copy control
 - Copy-to-clipboard preview button (colocated LiveView hook)
-- Payload and recipe CRUD, tags, and a catalog
+- Payload CRUD with tags, notes, favorites, and target metadata
+- Saved recipe snapshots containing template, variable values, chain, target
+  metadata, notes, tags, and favorite status
+- Recipe reopen, fork, search, and payload/recipe search
 - Nonce-based Content-Security-Policy
 - Quality gates: Credo, Sobelow, Dialyzer, ExUnit
 
@@ -158,7 +164,11 @@ docker build \
 - `Revkit.Catalog` is the only domain module that touches `Revkit.Repo`.
 - Transforms implement `Revkit.Transform`; recipe keys are resolved through
   `Revkit.Engine.Transforms`.
+- `Revkit.Engine.Template` performs `{{NAME}}` substitution without escaping or
+  execution.
 - `Revkit.Engine.Chain` halts on the first error.
+- `Revkit.Engine.Validator` compares transform requirements with payload target
+  metadata and reports pitfalls; it never probes the target.
 - LiveViews call `Catalog` and `Engine`; they never call `Repo`.
 - The copy button reads the preview from a `data-*` attribute via a colocated
   hook; there is no vendored JS file.
@@ -168,8 +178,9 @@ docker build \
 - No JSON API.
 - No authentication or multi-user accounts.
 - SQLite single-instance deployment only.
-- Payload templates are literal strings; variable substitution is not
-  implemented yet.
+- Transform `requires` are capability strings compared with target metadata;
+  they cannot prove that a remote host actually has the capability.
+- Variable values are plain strings; there is no shell escaping or execution.
 - The copy hook is browser-side; its markup/CSP wiring is tested, but a full
   clipboard test is manual.
 

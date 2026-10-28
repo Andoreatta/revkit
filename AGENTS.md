@@ -8,9 +8,10 @@ daisyUI + Heroicons, bundled by esbuild through Mix tasks; there is no
 The app generates and validates offensive-security payloads (reverse shells,
 wrappers, encoders). It is a pure-string pipeline: it does **not** execute
 anything. The pure engine (`Revkit.Transform`, `Revkit.Engine.Chain`,
-`Revkit.Engine.Transforms`), the persistence layer (`Revkit.Catalog`), and the
-LiveView UI (`GenerateLive`, `PayloadLive.*`, `RecipeLive.*`) are in place. `/`
-still serves the scaffold landing page; the product UI starts at `/generate`.
+`Revkit.Engine.Transforms`, `Revkit.Engine.Template`, `Revkit.Engine.Validator`),
+the persistence layer (`Revkit.Catalog`), and the LiveView UI (`GenerateLive`,
+`PayloadLive.*`, `RecipeLive.*`) are in place. `/` still serves the scaffold
+landing page; the product UI starts at `/generate`.
 This file describes the target architecture; update the stale lines as the code
 lands.
 
@@ -43,19 +44,21 @@ reintroduce ad-hoc lint/type/security commands outside the precommit alias.
 
 - `lib/revkit/` — domain and OTP: `Revkit.Repo`, `Revkit.Application`.
   - `lib/revkit/engine/` — pure payload engine: `Chain`, the `Transforms`
-    registry, `Transforms.*`, and `Validator` are implemented; `Template` is
-    planned. **← NOVO**
+    registry, `Transforms.*`, `Template`, and `Validator`. **← NOVO**
   - `lib/revkit/catalog/` — Ecto schemas (`Payload`, `Recipe`, `Tag`) and the
-    `Revkit.Catalog` context. Recipes keep their ordered transform steps as
-    JSON (`%{"key" => "base64_encode", "options" => %{}}`) so a recipe references
-    transforms by key. **← NOVO**
+    `Revkit.Catalog` context. `Payload` is a curated template with tags, target
+    metadata, notes, and a favorite flag. `Recipe` is a saved generation
+    snapshot: template, variable values, ordered transform steps as JSON
+    (`%{"key" => ..., "options" => ...}`), target metadata, notes, favorite, and
+    tags; reopening it must reproduce the exact saved combination. **← NOVO**
 - `lib/revkit_web/` — endpoint, router, controllers, components, layouts.
 - `lib/revkit_web.ex` — single macro entrypoint (`use RevkitWeb, :live_view |
   :controller | :html`). Put app-wide imports/aliases in `html_helpers`.
-- `lib/revkit_web/router.ex` — `:browser` and `:api` pipelines. `/dev/dashboard`
-  exists only when `:dev_routes` is true (set in `config/dev.exs`). The
-  LiveDashboard is a **dev-only observability tool**, not a domain feature — do
-  not surface it in the product, do not remove it from `dev`. **← NOVO**
+- `lib/revkit_web/router.ex` — `:browser` pipeline only; there is no JSON API.
+  `/dev/dashboard` exists only when `:dev_routes` is true (set in
+  `config/dev.exs`). The LiveDashboard is a **dev-only observability tool**, not
+  a domain feature — do not surface it in the product, do not remove it from
+  `dev`. **← NOVO**
 - `lib/revkit_web/plugs/content_security_policy.ex` — nonce-based CSP for the
   browser pipeline. Inline scripts must use `nonce={@csp_nonce}`; the
   LiveDashboard is configured with `csp_nonce_assign_key: :csp_nonce`.
@@ -97,9 +100,14 @@ the design collapses.
   adding a transform is adding code — never a row in a table.
 - **Chain application is `Enum.reduce_while/3`.** On the first `{:error, _}`,
   halt and return it. Do not rescue silently.
-- **`Validator` reads metadata only.** It aggregates `requires/0` and
-  `pitfalls/0` from the resolved chain; those strings are advisory because the
-  engine has no target profile. Never execute or probe the target to validate.
+- **`Validator` compares metadata; it never executes.** It aggregates
+  `requires/0` and `pitfalls/0` from the resolved chain and compares them with
+  the payload's declared target metadata (OS, shell, and available tools).
+  Missing target metadata produces an unknown-target warning; it never probes or
+  executes the target.
+- **Phoenix.LiveView uses `Phoenix.PubSub` internally.** Do not add custom
+  PubSub topics, Presence, or real-time collaboration. `Revkit.PubSub` is
+  framework infrastructure, not a product feature.
 - **Offensive-security scope:** the system *generates* and *validates* strings.
   It must never execute, spawn, `System.cmd/3`, or shell out to any payload.
   If a feature would execute a command, it is out of scope.
@@ -159,6 +167,11 @@ the design collapses.
   Keep the app on a private interface and terminate TLS in a reverse proxy. The
   app has **no auth and no JSON API**; protect a public deployment at the network
   layer. `DATABASE_PATH` defaults to `/data/revkit.db`, backed by a volume.
+  Docker is packaging/deployment only: the application must not integrate with
+  Docker/VM/Vagrant APIs, spawn containers, or manage VMs.
+- Quality infrastructure (Credo, Sobelow, Dialyzer, CSP, health checks, and
+  packaging) is exempt from the product's five-gap rule; do not expose it as a
+  product feature.
 - Docker context must exclude `priv/plts`; otherwise Dialyzer PLTs can bloat the
   release image.
 
@@ -166,8 +179,10 @@ the design collapses.
 
 - Build in this order: (1) pure engine + ExUnit tests, (2) `Catalog` schemas +
   context, (3) LiveViews, (4) validation/warnings in the UI, (5) colocated hook
-  for copy. Do not skip ahead — LiveViews generated before the engine works will
-  get rewritten.
+  for copy, (6) template variables and target metadata, (7) full saved-generation
+  Recipe snapshots and reopening, (8) curation (tags, favorites, notes, search).
+  Do not skip ahead — LiveViews generated before the engine works will get
+  rewritten.
 - Prompt the agent with the layer boundaries explicitly, e.g. *"pure functions
   only, no Ecto, no Phoenix"* for engine work.
 - `/undo` relies on Git. Commit after each layer passes `mix precommit`. Use
