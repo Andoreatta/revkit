@@ -4,12 +4,15 @@ defmodule Revkit.Catalog.Recipe do
 
   A recipe stores the template, variable values, ordered transform steps,
   target metadata, notes, and curation fields so it can be reopened exactly.
+  Public recipes have no owner; private editions carry an `owner_id` and point
+  at their public source through `source_recipe_id`.
   """
 
   use Ecto.Schema
   import Ecto.Changeset
 
   alias Revkit.Catalog.{Payload, Tag}
+  alias Revkit.Limits
 
   schema "recipes" do
     field :name, :string
@@ -22,8 +25,10 @@ defmodule Revkit.Catalog.Recipe do
     field :target_os, :string
     field :target_shell, :string
     field :target_tools, {:array, :string}, default: []
+    field :owner_id, :string
 
     belongs_to :payload, Payload
+    belongs_to :source_recipe, __MODULE__, foreign_key: :source_recipe_id
     many_to_many :tags, Tag, join_through: "recipes_tags", on_replace: :delete
 
     timestamps(type: :utc_datetime)
@@ -48,10 +53,18 @@ defmodule Revkit.Catalog.Recipe do
     |> update_change(:variables, &normalize_variables/1)
     |> update_change(:steps, &normalize_steps/1)
     |> validate_required([:name])
-    |> validate_length(:name, min: 1, max: 120)
-    |> validate_length(:description, max: 500)
+    |> validate_length(:name, min: 1, max: Limits.max_name())
+    |> validate_length(:description, max: Limits.max_description())
+    |> validate_length(:template, max: Limits.max_template())
+    |> validate_length(:notes, max: Limits.max_notes())
+    |> validate_length(:target_os, max: Limits.max_target())
+    |> validate_length(:target_shell, max: Limits.max_target())
     |> validate_variables()
     |> validate_steps()
+    |> validate_tools()
+    |> unique_constraint(:source_recipe_id,
+      name: :recipes_owner_id_source_recipe_id_index
+    )
   end
 
   defp normalize_variables(variables) when is_map(variables) do
@@ -63,10 +76,26 @@ defmodule Revkit.Catalog.Recipe do
   defp validate_variables(changeset) do
     case get_field(changeset, :variables) do
       variables when is_map(variables) ->
-        if valid_variables?(variables) do
-          changeset
-        else
-          add_error(changeset, :variables, "must map string names to string values")
+        cond do
+          not valid_variables?(variables) ->
+            add_error(changeset, :variables, "must map string names to string values")
+
+          map_size(variables) > Limits.max_variables() ->
+            add_error(changeset, :variables, "may contain at most %{count} variables",
+              count: Limits.max_variables()
+            )
+
+          Enum.any?(variables, &invalid_variable?/1) ->
+            add_error(
+              changeset,
+              :variables,
+              "names must be at most %{name} characters and values at most %{value} characters",
+              name: Limits.max_variable_name(),
+              value: Limits.max_variable_value()
+            )
+
+          true ->
+            changeset
         end
 
       _other ->
@@ -76,6 +105,10 @@ defmodule Revkit.Catalog.Recipe do
 
   defp valid_variables?(variables) do
     Enum.all?(variables, fn {key, value} -> is_binary(key) and is_binary(value) end)
+  end
+
+  defp invalid_variable?({key, value}) do
+    byte_size(key) > Limits.max_variable_name() or byte_size(value) > Limits.max_variable_value()
   end
 
   defp normalize_steps(steps) when is_list(steps), do: Enum.map(steps, &normalize_step/1)
@@ -100,10 +133,21 @@ defmodule Revkit.Catalog.Recipe do
   defp validate_steps(changeset) do
     steps = get_field(changeset, :steps) || []
 
-    if is_list(steps) and Enum.all?(steps, &valid_step?/1) do
-      changeset
-    else
-      add_error(changeset, :steps, "must be a list of steps with a string key and an options map")
+    cond do
+      not is_list(steps) or not Enum.all?(steps, &valid_step?/1) ->
+        add_error(
+          changeset,
+          :steps,
+          "must be a list of steps with a string key and an options map"
+        )
+
+      length(steps) > Limits.max_steps() ->
+        add_error(changeset, :steps, "may contain at most %{count} steps",
+          count: Limits.max_steps()
+        )
+
+      true ->
+        changeset
     end
   end
 
@@ -112,6 +156,32 @@ defmodule Revkit.Catalog.Recipe do
        do: true
 
   defp valid_step?(_step), do: false
+
+  defp validate_tools(changeset) do
+    case get_field(changeset, :target_tools) do
+      tools when is_list(tools) ->
+        cond do
+          length(tools) > Limits.max_tools() ->
+            add_error(changeset, :target_tools, "may contain at most %{count} tools",
+              count: Limits.max_tools()
+            )
+
+          Enum.any?(tools, &(not is_binary(&1) or byte_size(&1) > Limits.max_tool_length())) ->
+            add_error(
+              changeset,
+              :target_tools,
+              "tools must be at most %{count} characters",
+              count: Limits.max_tool_length()
+            )
+
+          true ->
+            changeset
+        end
+
+      _other ->
+        add_error(changeset, :target_tools, "must be a list of tools")
+    end
+  end
 
   @doc false
   def tags_changeset(recipe, tags) do

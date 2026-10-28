@@ -12,11 +12,19 @@ defmodule RevkitWeb.GenerateLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    owner_id = socket.assigns.owner_id
+    recipes = Catalog.list_recipes(owner_id)
+    payloads = Catalog.list_payloads(owner_id)
+
     {:ok,
      assign(socket,
-       recipes: Catalog.list_recipes(),
-       recent_recipes: Catalog.list_recent_recipes(),
-       payloads: Catalog.list_payloads(),
+       recipes: recipes,
+       recipe_options: option_labels(recipes),
+       recent_recipes: Catalog.list_recent_recipes(owner_id),
+       payloads: payloads,
+       payload_options: option_labels(payloads),
+       tags: Catalog.list_tags(),
+       save_tag_ids: [],
        template: "",
        variables: %{},
        variable_names: [],
@@ -31,7 +39,7 @@ defmodule RevkitWeb.GenerateLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    payload = payload_from_params(params["payload_id"])
+    payload = payload_from_params(params["payload_id"], socket.assigns.owner_id)
     recipe = find_recipe(params["recipe_id"], socket.assigns.recipes)
 
     state =
@@ -109,15 +117,25 @@ defmodule RevkitWeb.GenerateLive do
       |> Map.put("target_shell", socket.assigns.target[:shell])
       |> Map.put("target_tools", socket.assigns.target[:tools] || [])
 
-    case Catalog.create_recipe_with_tags(attrs, params["tags"]) do
+    case Catalog.create_recipe(socket.assigns.owner_id, attrs, params["tags"] || []) do
       {:ok, _recipe} ->
         {:noreply,
          socket
          |> put_flash(:info, "Recipe saved")
          |> push_navigate(to: ~p"/recipes")}
 
-      {:error, changeset} ->
-        {:noreply, assign(socket, save_form: to_form(changeset, action: :insert))}
+      {:error, :limit_reached} ->
+        {:noreply, put_flash(socket, :error, "You have reached the private edition limit")}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply,
+         assign(socket,
+           save_form: to_form(changeset, action: :insert),
+           save_tag_ids: parse_tag_ids(params["tags"])
+         )}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Could not save recipe")}
     end
   end
 
@@ -349,14 +367,33 @@ defmodule RevkitWeb.GenerateLive do
     end
   end
 
-  defp payload_from_params(nil), do: nil
-  defp payload_from_params(""), do: nil
+  defp payload_from_params(nil, _owner_id), do: nil
+  defp payload_from_params("", _owner_id), do: nil
 
-  defp payload_from_params(id) when is_binary(id) do
+  defp payload_from_params(id, owner_id) when is_binary(id) do
     case Integer.parse(id) do
-      {id, ""} -> Catalog.get_payload(id)
+      {id, ""} -> Catalog.get_payload(id, owner_id)
       _other -> nil
     end
+  end
+
+  defp option_labels(records) do
+    Enum.map(records, fn record ->
+      label = if record.owner_id, do: "#{record.name} (your edition)", else: record.name
+      {label, record.id}
+    end)
+  end
+
+  defp parse_tag_ids(tag_ids) do
+    tag_ids
+    |> List.wrap()
+    |> Enum.reduce([], fn tag_id, acc ->
+      case Integer.parse(to_string(tag_id)) do
+        {id, ""} -> [id | acc]
+        _other -> acc
+      end
+    end)
+    |> Enum.reverse()
   end
 
   defp find_payload(id, payloads) do

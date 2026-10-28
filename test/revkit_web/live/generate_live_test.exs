@@ -5,6 +5,8 @@ defmodule RevkitWeb.GenerateLiveTest do
 
   alias Revkit.Catalog
 
+  @owner "test-owner-00000001"
+
   test "renders the generator at the root route", %{conn: conn} do
     {:ok, _view, html} = live(conn, ~p"/")
 
@@ -13,7 +15,7 @@ defmodule RevkitWeb.GenerateLiveTest do
 
   test "renders the generator with recipes", %{conn: conn} do
     {:ok, _recipe} =
-      Catalog.create_recipe(%{
+      Catalog.create_recipe(@owner, %{
         name: "Encode",
         steps: [%{"key" => "base64_encode", "options" => %{}}]
       })
@@ -35,13 +37,13 @@ defmodule RevkitWeb.GenerateLiveTest do
 
   test "previews a recipe on phx-change without writing to the database", %{conn: conn} do
     {:ok, recipe} =
-      Catalog.create_recipe(%{
+      Catalog.create_recipe(@owner, %{
         name: "Encode",
         steps: [%{"key" => "base64_encode", "options" => %{}}]
       })
 
     {:ok, view, _html} = live(conn, ~p"/generate")
-    payloads_before = Catalog.list_payloads()
+    payloads_before = Catalog.list_payloads(@owner)
 
     html =
       render_change(view, "preview", %{
@@ -50,12 +52,12 @@ defmodule RevkitWeb.GenerateLiveTest do
       })
 
     assert html =~ "aGVsbG8="
-    assert Catalog.list_payloads() == payloads_before
+    assert Catalog.list_payloads(@owner) == payloads_before
   end
 
   test "applies the recipe in order", %{conn: conn} do
     {:ok, recipe} =
-      Catalog.create_recipe(%{
+      Catalog.create_recipe(@owner, %{
         name: "Wrap then encode",
         steps: [
           %{"key" => "bash_wrapper", "options" => %{}},
@@ -84,13 +86,13 @@ defmodule RevkitWeb.GenerateLiveTest do
 
   test "prefills the template and recipe from a saved payload", %{conn: conn} do
     {:ok, recipe} =
-      Catalog.create_recipe(%{
+      Catalog.create_recipe(@owner, %{
         name: "Encode",
         steps: [%{"key" => "base64_encode", "options" => %{}}]
       })
 
     {:ok, payload} =
-      Catalog.create_payload(%{
+      Catalog.create_payload(@owner, %{
         name: "Saved",
         template: "hello",
         recipe_id: recipe.id
@@ -104,7 +106,7 @@ defmodule RevkitWeb.GenerateLiveTest do
 
   test "shows the recipe requirements and pitfalls", %{conn: conn} do
     {:ok, recipe} =
-      Catalog.create_recipe(%{
+      Catalog.create_recipe(@owner, %{
         name: "Wrapped",
         steps: [%{"key" => "bash_wrapper", "options" => %{}}]
       })
@@ -125,7 +127,7 @@ defmodule RevkitWeb.GenerateLiveTest do
 
   test "renders the copy hook with the current preview value", %{conn: conn} do
     {:ok, recipe} =
-      Catalog.create_recipe(%{
+      Catalog.create_recipe(@owner, %{
         name: "Encode",
         steps: [%{"key" => "base64_encode", "options" => %{}}]
       })
@@ -153,7 +155,7 @@ defmodule RevkitWeb.GenerateLiveTest do
 
   test "hides the copy button when the preview fails", %{conn: conn} do
     {:ok, recipe} =
-      Catalog.create_recipe(%{
+      Catalog.create_recipe(@owner, %{
         name: "Broken",
         steps: [%{"key" => "does_not_exist", "options" => %{}}]
       })
@@ -191,13 +193,13 @@ defmodule RevkitWeb.GenerateLiveTest do
 
   test "warns about incompatible target metadata before the copy button", %{conn: conn} do
     {:ok, recipe} =
-      Catalog.create_recipe(%{
+      Catalog.create_recipe(@owner, %{
         name: "Bash",
         steps: [%{"key" => "bash_wrapper", "options" => %{}}]
       })
 
     {:ok, payload} =
-      Catalog.create_payload(%{
+      Catalog.create_payload(@owner, %{
         name: "Linux sh",
         template: "id",
         target_os: "linux",
@@ -231,7 +233,7 @@ defmodule RevkitWeb.GenerateLiveTest do
 
   test "reopens a saved recipe snapshot", %{conn: conn} do
     {:ok, recipe} =
-      Catalog.create_recipe(%{
+      Catalog.create_recipe(@owner, %{
         name: "Snapshot",
         template: "id {{HOST}}",
         variables: %{"HOST" => "10.0.0.1"},
@@ -249,7 +251,7 @@ defmodule RevkitWeb.GenerateLiveTest do
     conn: conn
   } do
     {:ok, recipe} =
-      Catalog.create_recipe(%{
+      Catalog.create_recipe(@owner, %{
         name: "Different snapshot",
         template: "recipe {{HOST}}",
         variables: %{"HOST" => "recipe"},
@@ -257,7 +259,7 @@ defmodule RevkitWeb.GenerateLiveTest do
       })
 
     {:ok, payload} =
-      Catalog.create_payload(%{
+      Catalog.create_payload(@owner, %{
         name: "Payload",
         template: "payload {{HOST}}",
         recipe_id: recipe.id
@@ -270,6 +272,7 @@ defmodule RevkitWeb.GenerateLiveTest do
   end
 
   test "saves the full generation snapshot as a recipe", %{conn: conn} do
+    {:ok, tag} = Catalog.create_tag(%{name: "unix"})
     {:ok, view, _html} = live(conn, ~p"/generate")
 
     render_change(view, "preview", %{
@@ -286,12 +289,16 @@ defmodule RevkitWeb.GenerateLiveTest do
     })
 
     render_submit(view, "save_recipe", %{
-      "recipe" => %{"name" => "Saved generation", "notes" => "note", "tags" => "unix"}
+      "recipe" => %{
+        "name" => "Saved generation",
+        "notes" => "note",
+        "tags" => [to_string(tag.id)]
+      }
     })
 
     assert_redirect(view, ~p"/recipes")
 
-    assert [recipe] = Catalog.list_recipes()
+    assert [recipe] = Catalog.list_owned_recipes(@owner)
     assert recipe.template == "id {{HOST}}"
     assert recipe.variables == %{"HOST" => "10.0.0.1"}
     assert recipe.steps == [%{"key" => "base64_encode", "options" => %{}}]
@@ -301,7 +308,7 @@ defmodule RevkitWeb.GenerateLiveTest do
 
   test "shows an error for a recipe with an unknown transform", %{conn: conn} do
     {:ok, recipe} =
-      Catalog.create_recipe(%{
+      Catalog.create_recipe(@owner, %{
         name: "Broken",
         steps: [%{"key" => "does_not_exist", "options" => %{}}]
       })

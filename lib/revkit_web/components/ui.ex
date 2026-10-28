@@ -46,6 +46,37 @@ defmodule RevkitWeb.UI do
   end
 
   attr :tags, :list, required: true
+  attr :selected, :list, default: []
+  attr :name, :string, required: true
+  attr :id, :string, required: true
+
+  def tag_picker(assigns) do
+    ~H"""
+    <fieldset id={@id} class="fieldset mb-2">
+      <legend class="label mb-1">Tags</legend>
+      <div class="flex flex-wrap gap-2">
+        <label
+          :for={tag <- @tags}
+          class="label cursor-pointer gap-2 rounded-box border border-base-300 px-3 py-1.5"
+        >
+          <input
+            type="checkbox"
+            name={@name}
+            value={tag.id}
+            checked={tag.id in @selected}
+            class="checkbox checkbox-sm checkbox-primary"
+          />
+          <span class="label-text text-sm">{tag.name}</span>
+        </label>
+      </div>
+      <p class="mt-1 text-xs text-base-content/60">
+        Choose up to {Revkit.Limits.max_tags()} tags from the fixed vocabulary.
+      </p>
+    </fieldset>
+    """
+  end
+
+  attr :tags, :list, required: true
   attr :empty, :string, default: "—"
 
   def tag_badges(assigns) do

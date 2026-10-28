@@ -4,11 +4,15 @@ defmodule RevkitWeb.Endpoint do
   # The session will be stored in the cookie and signed,
   # this means its contents can be read but not tampered with.
   # Set :encryption_salt if you would also like to encrypt it.
+  # The owner identifier scopes private editions to this browser. A one-year
+  # cookie keeps them accessible across restarts; clearing it loses access.
   @session_options [
     store: :cookie,
     key: "_revkit_key",
     signing_salt: "ccrXbITL",
-    same_site: "Lax"
+    same_site: "Lax",
+    http_only: true,
+    max_age: 31_536_000
   ]
 
   socket "/live", Phoenix.LiveView.Socket,

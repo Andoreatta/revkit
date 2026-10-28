@@ -33,6 +33,29 @@ defmodule RevkitWeb.ConnCase do
 
   setup tags do
     Revkit.DataCase.setup_sandbox(tags)
-    {:ok, conn: Phoenix.ConnTest.build_conn()}
+    {:ok, conn: owner_conn("test-owner-00000001")}
+  end
+
+  @doc """
+  Builds a connection whose signed session cookie owns `owner_id`.
+
+  A real cookie is used so the static render and the connected LiveView see the
+  same owner, just like a browser would.
+  """
+  def owner_conn(owner_id) do
+    conn = Phoenix.ConnTest.build_conn()
+
+    conn
+    |> Plug.Test.init_test_session(%{owner_id: owner_id})
+    |> Plug.Conn.put_req_header("cookie", "_revkit_key=" <> session_cookie(conn, owner_id))
+  end
+
+  defp session_cookie(conn, owner_id) do
+    endpoint_config = Application.fetch_env!(:revkit, RevkitWeb.Endpoint)
+    conn = %{conn | secret_key_base: endpoint_config[:secret_key_base]}
+
+    store = Plug.Session.COOKIE
+    config = store.init(signing_salt: "ccrXbITL")
+    store.put(conn, nil, %{"owner_id" => owner_id}, config)
   end
 end

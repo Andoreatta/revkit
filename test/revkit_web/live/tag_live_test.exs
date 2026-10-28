@@ -5,35 +5,27 @@ defmodule RevkitWeb.TagLiveTest do
 
   alias Revkit.Catalog
 
-  test "creates a tag", %{conn: conn} do
-    {:ok, view, _html} = live(conn, ~p"/tags")
-
-    render_submit(view, "create", %{"tag" => %{"name" => "unix"}})
-
-    assert [%{name: "unix"}] = Catalog.list_tags()
-  end
-
-  test "renames a tag", %{conn: conn} do
-    {:ok, tag} = Catalog.create_tag(%{name: "unix"})
-
-    {:ok, view, _html} = live(conn, ~p"/tags")
-
-    render_submit(view, "rename", %{"tag_id" => to_string(tag.id), "tag" => %{"name" => "linux"}})
-
-    assert Catalog.get_tag!(tag.id).name == "linux"
-  end
-
-  test "deletes a tag from payloads and recipes", %{conn: conn} do
-    {:ok, tag} = Catalog.create_tag(%{name: "unix"})
+  test "shows the fixed vocabulary with usage counts", %{conn: conn} do
+    {:ok, linux} = Catalog.create_tag(%{name: "linux"})
 
     {:ok, _payload} =
-      Catalog.create_payload_with_tags(%{name: "Payload", template: "id"}, ["unix"])
+      Catalog.create_public_payload(%{name: "Payload", template: "id"}, [linux.id])
 
-    {:ok, view, _html} = live(conn, ~p"/tags")
+    {:ok, _recipe} = Catalog.create_public_recipe(%{name: "Recipe"}, [linux.id])
 
-    render_click(view, "delete", %{"id" => to_string(tag.id)})
+    {:ok, view, html} = live(conn, ~p"/tags")
 
-    assert Catalog.list_tags() == []
-    assert Catalog.list_payloads() |> hd() |> Map.fetch!(:tags) == []
+    assert html =~ "linux"
+    assert html =~ "1 payloads"
+    assert html =~ "1 recipes"
+    assert html =~ "read-only"
+    refute has_element?(view, "#new-tag-form")
+    refute has_element?(view, "#rename-tag-#{linux.id}")
+  end
+
+  test "shows an empty state when the vocabulary is missing", %{conn: conn} do
+    {:ok, _view, html} = live(conn, ~p"/tags")
+
+    assert html =~ "No tags yet"
   end
 end

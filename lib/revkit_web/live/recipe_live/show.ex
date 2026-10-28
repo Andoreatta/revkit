@@ -11,11 +11,12 @@ defmodule RevkitWeb.RecipeLive.Show do
 
   @impl true
   def handle_params(%{"id" => id}, _uri, socket) do
-    recipe = Catalog.get_recipe!(id)
+    recipe = Catalog.get_recipe!(id, socket.assigns.owner_id)
 
     {:noreply,
      assign(socket,
        recipe: recipe,
+       owned: owned?(recipe, socket.assigns.owner_id),
        variables: variable_rows(recipe),
        chain: chain_labels(recipe)
      )}
@@ -23,33 +24,48 @@ defmodule RevkitWeb.RecipeLive.Show do
 
   @impl true
   def handle_event("toggle_favorite", _params, socket) do
-    {:ok, recipe} = Catalog.toggle_recipe_favorite(socket.assigns.recipe)
-    {:noreply, assign(socket, :recipe, recipe)}
-  end
+    case Catalog.toggle_recipe_favorite(socket.assigns.recipe, socket.assigns.owner_id) do
+      {:ok, recipe} ->
+        {:noreply, assign(socket, :recipe, recipe)}
 
-  @impl true
-  def handle_event("fork", _params, socket) do
-    case Catalog.fork_recipe(socket.assigns.recipe) do
-      {:ok, forked} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Recipe forked as #{forked.name}")
-         |> push_navigate(to: ~p"/recipes/#{forked.id}")}
-
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Could not fork recipe")}
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Public entries cannot be favorited")}
     end
   end
 
   @impl true
-  def handle_event("delete", _params, socket) do
-    {:ok, _recipe} = Catalog.delete_recipe(socket.assigns.recipe)
+  def handle_event("improve", _params, socket) do
+    case Catalog.improve_recipe(socket.assigns.recipe, socket.assigns.owner_id) do
+      {:ok, edition} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Your edition is ready")
+         |> push_navigate(to: ~p"/recipes/#{edition.id}")}
 
-    {:noreply,
-     socket
-     |> put_flash(:info, "Recipe deleted")
-     |> push_navigate(to: ~p"/recipes")}
+      {:error, :limit_reached} ->
+        {:noreply, put_flash(socket, :error, "Edition limit reached")}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Could not improve recipe")}
+    end
   end
+
+  @impl true
+  def handle_event("discard", _params, socket) do
+    case Catalog.discard_recipe(socket.assigns.recipe, socket.assigns.owner_id) do
+      {:ok, _recipe} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Edition discarded")
+         |> push_navigate(to: ~p"/recipes")}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Could not discard edition")}
+    end
+  end
+
+  defp owned?(%{owner_id: owner_id}, owner_id) when is_binary(owner_id), do: true
+  defp owned?(_recipe, _owner_id), do: false
 
   defp variable_rows(recipe) do
     names =

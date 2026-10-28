@@ -1,9 +1,12 @@
 <Layouts.app flash={@flash} current={:recipes}>
   <.header>
     Recipes
-    <:subtitle>Saved generation snapshots: template, variables, chain, and context.</:subtitle>
+    <:subtitle>
+      Public snapshots plus private editions for this browser. Improving a public recipe never
+      changes the original.
+    </:subtitle>
     <:actions>
-      <.button variant="primary" navigate={~p"/generate"}>New recipe</.button>
+      <.button variant="primary" navigate={~p"/generate"}>New private recipe</.button>
     </:actions>
   </.header>
 
@@ -48,10 +51,6 @@
     </div>
   </form>
 
-  <p class="mb-3 text-xs text-base-content/50">
-    {length(@recipes)} {if length(@recipes) == 1, do: "recipe", else: "recipes"}
-  </p>
-
   <UI.empty_state
     :if={@recipes == []}
     icon="hero-rectangle-stack"
@@ -69,80 +68,177 @@
     </:actions>
   </UI.empty_state>
 
-  <div :if={@recipes != []} class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-    <article
-      :for={recipe <- @recipes}
-      id={"recipe-card-#{recipe.id}"}
-      class="card border border-base-300 bg-base-100 shadow-sm"
-    >
-      <div class="card-body gap-3 p-5">
-        <div class="flex items-start justify-between gap-2">
-          <div class="min-w-0">
-            <h2 class="card-title text-base">
-              <.link navigate={~p"/recipes/#{recipe.id}"} class="link-hover">
-                {recipe.name}
-              </.link>
-            </h2>
-            <p :if={recipe.description} class="mt-1 text-sm text-base-content/60">
-              {recipe.description}
-            </p>
-          </div>
-          <UI.favorite_button favorite={recipe.favorite} id={recipe.id} />
-        </div>
-
-        <pre class="max-h-20 overflow-hidden whitespace-pre-wrap break-all rounded-box bg-base-200 px-3 py-2 font-mono text-xs text-base-content/70">{recipe.template}</pre>
-
-        <div :if={@chains[recipe.id] != []} class="flex flex-wrap gap-1">
-          <span
-            :for={label <- @chains[recipe.id]}
-            class={[
-              "badge badge-sm",
-              label.known && "badge-outline",
-              !label.known && "badge-warning"
-            ]}
-          >
-            {label.label}
-          </span>
-        </div>
-
-        <UI.target_badges
-          os={recipe.target_os}
-          shell={recipe.target_shell}
-          tools={recipe.target_tools}
-        />
-
-        <UI.tag_badges tags={recipe.tags} />
-
-        <div class="mt-auto flex flex-wrap items-center gap-1 border-t border-base-200 pt-3">
-          <.link navigate={~p"/generate?recipe_id=#{recipe.id}"} class="btn btn-primary btn-sm">
-            Open
-          </.link>
-          <.link navigate={~p"/recipes/#{recipe.id}"} class="btn btn-ghost btn-sm">
-            View
-          </.link>
-          <button
-            type="button"
-            class="btn btn-ghost btn-sm"
-            phx-click="fork"
-            phx-value-id={recipe.id}
-            data-confirm="Fork this recipe?"
-          >
-            Fork
-          </button>
-          <.link navigate={~p"/recipes/#{recipe.id}/edit"} class="btn btn-ghost btn-sm">
-            Edit
-          </.link>
-          <button
-            type="button"
-            class="btn btn-ghost btn-sm ml-auto text-error"
-            phx-click="delete"
-            phx-value-id={recipe.id}
-            data-confirm="Delete this recipe?"
-          >
-            Delete
-          </button>
-        </div>
+  <div :if={@recipes != []} class="space-y-8">
+    <section class="space-y-3">
+      <div class="flex flex-wrap items-center gap-2">
+        <h2 class="text-base font-semibold">Public catalog</h2>
+        <span class="badge badge-ghost badge-sm">{length(@public_recipes)}</span>
+        <span class="text-xs text-base-content/50">read-only</span>
       </div>
-    </article>
+
+      <p :if={@public_recipes == []} class="text-sm text-base-content/60">
+        No public recipes match these filters.
+      </p>
+
+      <div :if={@public_recipes != []} class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <article
+          :for={recipe <- @public_recipes}
+          id={"recipe-card-#{recipe.id}"}
+          class="card border border-base-300 bg-base-100 shadow-sm"
+        >
+          <div class="card-body gap-3 p-5">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <h3 class="card-title text-base">
+                  <.link navigate={~p"/recipes/#{recipe.id}"} class="link-hover">
+                    {recipe.name}
+                  </.link>
+                </h3>
+                <span class="badge badge-outline badge-sm">Public</span>
+              </div>
+              <p :if={recipe.description} class="mt-1 text-sm text-base-content/60">
+                {recipe.description}
+              </p>
+            </div>
+
+            <pre class="max-h-20 overflow-hidden whitespace-pre-wrap break-all rounded-box bg-base-200 px-3 py-2 font-mono text-xs text-base-content/70">{recipe.template}</pre>
+
+            <div :if={@chains[recipe.id] != []} class="flex flex-wrap gap-1">
+              <span
+                :for={label <- @chains[recipe.id]}
+                class={[
+                  "badge badge-sm",
+                  label.known && "badge-outline",
+                  !label.known && "badge-warning"
+                ]}
+              >
+                {label.label}
+              </span>
+            </div>
+
+            <UI.target_badges
+              os={recipe.target_os}
+              shell={recipe.target_shell}
+              tools={recipe.target_tools}
+            />
+
+            <UI.tag_badges tags={recipe.tags} />
+
+            <div class="mt-auto flex flex-wrap items-center gap-1 border-t border-base-200 pt-3">
+              <.link
+                navigate={~p"/generate?recipe_id=#{recipe.id}"}
+                class="btn btn-primary btn-sm"
+              >
+                Open
+              </.link>
+              <.link navigate={~p"/recipes/#{recipe.id}"} class="btn btn-ghost btn-sm">
+                View
+              </.link>
+              <button
+                type="button"
+                id={"improve-recipe-#{recipe.id}"}
+                class="btn btn-ghost btn-sm ml-auto"
+                phx-click="improve"
+                phx-value-id={recipe.id}
+              >
+                Improve
+              </button>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="space-y-3">
+      <div class="flex flex-wrap items-center gap-2">
+        <h2 class="text-base font-semibold">Your editions</h2>
+        <span class="badge badge-ghost badge-sm">{@quota} / {Revkit.Limits.max_private_editions()}</span>
+        <span class="text-xs text-base-content/50">only this browser</span>
+      </div>
+
+      <p :if={@owned_recipes == []} class="text-sm text-base-content/60">
+        No private editions yet. Use Improve on a public recipe, or save one from the generator.
+      </p>
+
+      <div :if={@owned_recipes != []} class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <article
+          :for={recipe <- @owned_recipes}
+          id={"recipe-card-#{recipe.id}"}
+          class="card border border-primary/30 bg-base-100 shadow-sm"
+        >
+          <div class="card-body gap-3 p-5">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <h3 class="card-title text-base">
+                    <.link navigate={~p"/recipes/#{recipe.id}"} class="link-hover">
+                      {recipe.name}
+                    </.link>
+                  </h3>
+                  <span class="badge badge-primary badge-sm">Your edition</span>
+                </div>
+                <p :if={recipe.description} class="mt-1 text-sm text-base-content/60">
+                  {recipe.description}
+                </p>
+              </div>
+              <UI.favorite_button favorite={recipe.favorite} id={recipe.id} />
+            </div>
+
+            <pre class="max-h-20 overflow-hidden whitespace-pre-wrap break-all rounded-box bg-base-200 px-3 py-2 font-mono text-xs text-base-content/70">{recipe.template}</pre>
+
+            <div :if={@chains[recipe.id] != []} class="flex flex-wrap gap-1">
+              <span
+                :for={label <- @chains[recipe.id]}
+                class={[
+                  "badge badge-sm",
+                  label.known && "badge-outline",
+                  !label.known && "badge-warning"
+                ]}
+              >
+                {label.label}
+              </span>
+            </div>
+
+            <UI.target_badges
+              os={recipe.target_os}
+              shell={recipe.target_shell}
+              tools={recipe.target_tools}
+            />
+
+            <UI.tag_badges tags={recipe.tags} />
+
+            <p :if={recipe.source_recipe} class="text-xs text-base-content/50">
+              Based on public:
+              <span class="font-medium text-base-content/70">{recipe.source_recipe.name}</span>
+            </p>
+
+            <div class="mt-auto flex flex-wrap items-center gap-1 border-t border-base-200 pt-3">
+              <.link
+                navigate={~p"/generate?recipe_id=#{recipe.id}"}
+                class="btn btn-primary btn-sm"
+              >
+                Open
+              </.link>
+              <.link navigate={~p"/recipes/#{recipe.id}"} class="btn btn-ghost btn-sm">
+                View
+              </.link>
+              <.link navigate={~p"/recipes/#{recipe.id}/edit"} class="btn btn-ghost btn-sm">
+                Edit
+              </.link>
+              <button
+                type="button"
+                id={"discard-recipe-#{recipe.id}"}
+                class="btn btn-ghost btn-sm ml-auto text-error"
+                phx-click="discard"
+                phx-value-id={recipe.id}
+                data-confirm="Discard your edition? The public original stays."
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
   </div>
 </Layouts.app>

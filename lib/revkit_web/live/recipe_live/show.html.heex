@@ -6,8 +6,26 @@
       <.link navigate={~p"/generate?recipe_id=#{@recipe.id}"} class="btn btn-primary btn-sm">
         Open in generator
       </.link>
+      <button :if={!@owned} type="button" class="btn btn-ghost btn-sm" phx-click="improve">
+        Improve for me
+      </button>
     </:actions>
   </.header>
+
+  <div class="mb-6 flex flex-wrap items-center gap-2">
+    <span class={["badge badge-sm", @owned && "badge-primary", !@owned && "badge-outline"]}>
+      {if @owned, do: "Your edition", else: "Public catalog"}
+    </span>
+    <span :if={!@owned} class="text-xs text-base-content/50">
+      Read-only. Improve it to edit a private copy for this browser.
+    </span>
+    <span :if={@owned && @recipe.source_recipe} class="text-xs text-base-content/50">
+      Based on public:
+      <.link navigate={~p"/recipes/#{@recipe.source_recipe.id}"} class="link">
+        {@recipe.source_recipe.name}
+      </.link>
+    </span>
+  </div>
 
   <div class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
     <div class="space-y-6">
@@ -15,7 +33,7 @@
         <div class="card-body gap-4">
           <div class="flex items-center justify-between gap-2">
             <h2 class="card-title">Snapshot</h2>
-            <UI.favorite_button favorite={@recipe.favorite} id={@recipe.id} />
+            <UI.favorite_button :if={@owned} favorite={@recipe.favorite} id={@recipe.id} />
           </div>
 
           <UI.code_block content={@recipe.template} />
@@ -89,24 +107,21 @@
       </section>
 
       <div class="flex flex-wrap gap-2">
-        <button
-          type="button"
+        <.link
+          :if={@owned}
+          navigate={~p"/recipes/#{@recipe.id}/edit"}
           class="btn btn-ghost btn-sm"
-          phx-click="fork"
-          data-confirm="Fork this recipe?"
         >
-          Fork
-        </button>
-        <.link navigate={~p"/recipes/#{@recipe.id}/edit"} class="btn btn-ghost btn-sm">
-          Edit
+          Edit my edition
         </.link>
         <button
+          :if={@owned}
           type="button"
           class="btn btn-ghost btn-sm text-error"
-          phx-click="delete"
-          data-confirm="Delete this recipe?"
+          phx-click="discard"
+          data-confirm="Discard your edition? The public original stays."
         >
-          Delete
+          Discard edition
         </button>
         <.link navigate={~p"/recipes"} class="btn btn-ghost btn-sm">Back to recipes</.link>
       </div>

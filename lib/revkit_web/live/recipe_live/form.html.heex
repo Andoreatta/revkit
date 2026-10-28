@@ -1,7 +1,9 @@
 <Layouts.app flash={@flash} current={:recipes}>
   <.header>
-    {if @live_action == :new, do: "New recipe", else: "Edit recipe"}
-    <:subtitle>Snapshot metadata, target assumptions, and the ordered chain.</:subtitle>
+    {if @live_action == :new, do: "New private recipe", else: "Edit your recipe edition"}
+    <:subtitle>
+      Private editions are visible only to this browser. The public catalog is never modified.
+    </:subtitle>
     <:actions>
       <.button navigate={~p"/recipes"}>Back</.button>
     </:actions>
@@ -18,14 +20,20 @@
       <section class="card border border-base-300 bg-base-100 shadow-sm">
         <div class="card-body gap-4">
           <h2 class="card-title text-base">Basics</h2>
-          <.input field={@form[:name]} type="text" label="Name" />
+          <.input
+            field={@form[:name]}
+            type="text"
+            label="Name"
+            maxlength={Revkit.Limits.max_name()}
+          />
           <.input
             field={@form[:description]}
             type="text"
             label="When to use"
+            maxlength={Revkit.Limits.max_description()}
             placeholder="e.g. Transport an encoded Bash TCP payload"
           />
-          <.input field={@form[:favorite]} type="checkbox" label="Favorite" />
+          <.input field={@form[:favorite]} type="checkbox" label="Favorite this edition" />
         </div>
       </section>
 
@@ -46,11 +54,13 @@
             type="textarea"
             rows="6"
             label="Payload template"
+            maxlength={Revkit.Limits.max_template()}
             class="w-full textarea font-mono text-sm"
           />
           <p class="text-xs text-base-content/60">
-            The saved variable values are preserved. Use the generator to edit variables and
-            test the chain.
+            Saved variable values are preserved. Up to {Revkit.Limits.max_variables()} variables
+            and {Revkit.Limits.max_steps()} transforms. Use the generator to edit variables and test
+            the chain.
           </p>
         </div>
       </section>
@@ -63,12 +73,14 @@
               field={@form[:target_os]}
               type="text"
               label="Target OS"
+              maxlength={Revkit.Limits.max_target()}
               placeholder="linux, windows, macos"
             />
             <.input
               field={@form[:target_shell]}
               type="text"
               label="Target shell"
+              maxlength={Revkit.Limits.max_target()}
               placeholder="bash, sh, powershell"
             />
           </div>
@@ -83,6 +95,9 @@
               placeholder="base64, curl, nc"
               class="w-full input"
             />
+            <p class="mt-1 text-xs text-base-content/60">
+              Comma-separated, up to {Revkit.Limits.max_tools()} tools of {Revkit.Limits.max_tool_length()} characters each.
+            </p>
           </div>
         </div>
       </section>
@@ -90,28 +105,26 @@
       <section class="card border border-base-300 bg-base-100 shadow-sm">
         <div class="card-body gap-4">
           <h2 class="card-title text-base">Curation</h2>
-          <div class="fieldset mb-2">
-            <label for="recipe-tags" class="label mb-1">Tags</label>
-            <input
-              id="recipe-tags"
-              type="text"
-              name="recipe[tags]"
-              value={@tag_names}
-              placeholder="linux, transport, base64"
-              class="w-full input"
-            />
-            <p class="mt-1 text-xs text-base-content/60">
-              Comma-separated. Missing tags are created on save.
-            </p>
-          </div>
+
+          <UI.tag_picker
+            id="recipe-tags"
+            tags={@tags}
+            selected={@selected_tag_ids}
+            name="recipe[tags][]"
+          />
 
           <.input
             field={@form[:notes]}
             type="textarea"
             rows="4"
             label="Context & caveats"
+            maxlength={Revkit.Limits.max_notes()}
             placeholder="When to use it, decoding requirements, cleanup, detection notes…"
           />
+
+          <p class="text-xs text-base-content/60">
+            Up to {Revkit.Limits.max_notes()} characters of context. Tags are fixed and capped at {Revkit.Limits.max_tags()} per entry.
+          </p>
         </div>
       </section>
 

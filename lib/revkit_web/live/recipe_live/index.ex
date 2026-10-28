@@ -37,37 +37,43 @@ defmodule RevkitWeb.RecipeLive.Index do
 
   @impl true
   def handle_event("toggle_favorite", %{"id" => id}, socket) do
-    recipe = Catalog.get_recipe!(id)
-    {:ok, _recipe} = Catalog.toggle_recipe_favorite(recipe)
-    {:noreply, refresh(socket)}
-  end
+    recipe = Catalog.get_owned_recipe!(id, socket.assigns.owner_id)
 
-  @impl true
-  def handle_event("fork", %{"id" => id}, socket) do
-    recipe = Catalog.get_recipe!(id)
-
-    case Catalog.fork_recipe(recipe) do
-      {:ok, forked} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Recipe forked as #{forked.name}")
-         |> refresh()}
-
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Could not fork recipe")}
+    case Catalog.toggle_recipe_favorite(recipe, socket.assigns.owner_id) do
+      {:ok, _recipe} -> {:noreply, refresh(socket)}
+      {:error, _reason} -> {:noreply, put_flash(socket, :error, "Could not favorite recipe")}
     end
   end
 
   @impl true
-  def handle_event("delete", %{"id" => id}, socket) do
-    recipe = Catalog.get_recipe!(id)
+  def handle_event("improve", %{"id" => id}, socket) do
+    recipe = Catalog.get_recipe!(id, socket.assigns.owner_id)
 
-    case Catalog.delete_recipe(recipe) do
+    case Catalog.improve_recipe(recipe, socket.assigns.owner_id) do
+      {:ok, edition} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Your edition is ready")
+         |> push_navigate(to: ~p"/recipes/#{edition.id}/edit")}
+
+      {:error, :limit_reached} ->
+        {:noreply, put_flash(socket, :error, "Edition limit reached")}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Could not improve recipe")}
+    end
+  end
+
+  @impl true
+  def handle_event("discard", %{"id" => id}, socket) do
+    recipe = Catalog.get_owned_recipe!(id, socket.assigns.owner_id)
+
+    case Catalog.discard_recipe(recipe, socket.assigns.owner_id) do
       {:ok, _recipe} ->
-        {:noreply, socket |> put_flash(:info, "Recipe deleted") |> refresh()}
+        {:noreply, socket |> put_flash(:info, "Edition discarded") |> refresh()}
 
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Could not delete recipe")}
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Could not discard edition")}
     end
   end
 
@@ -82,13 +88,19 @@ defmodule RevkitWeb.RecipeLive.Index do
 
   defp assign_recipes(socket, query, favorites_only, tag_id) do
     recipes =
-      Catalog.search_recipes(query, favorite: favorites_only, tag_id: tag_id)
+      Catalog.search_recipes(socket.assigns.owner_id, query,
+        favorite: favorites_only,
+        tag_id: tag_id
+      )
 
     chains = Map.new(recipes, fn recipe -> {recipe.id, chain_labels(recipe)} end)
 
     assign(socket,
       recipes: recipes,
+      public_recipes: Enum.filter(recipes, &is_nil(&1.owner_id)),
+      owned_recipes: Enum.reject(recipes, &is_nil(&1.owner_id)),
       chains: chains,
+      quota: Catalog.private_recipe_count(socket.assigns.owner_id),
       query: query || "",
       favorites_only: favorites_only,
       tag_id: tag_id

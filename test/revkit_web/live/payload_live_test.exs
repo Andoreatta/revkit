@@ -5,23 +5,68 @@ defmodule RevkitWeb.PayloadLiveTest do
 
   alias Revkit.Catalog
 
-  test "lists payloads with their recipe and tags", %{conn: conn} do
-    {:ok, recipe} = Catalog.create_recipe(%{name: "Encode"})
+  @owner "test-owner-00000001"
 
-    {:ok, _payload} =
-      Catalog.create_payload_with_tags(
-        %{name: "Payload", template: "echo hi", recipe_id: recipe.id},
-        ["unix"]
+  defp tag!(name) do
+    {:ok, tag} = Catalog.create_tag(%{name: name})
+    tag
+  end
+
+  test "lists public payloads and the owner's editions", %{conn: conn} do
+    {:ok, recipe} = Catalog.create_public_recipe(%{name: "Encode"})
+    linux = tag!("linux")
+
+    {:ok, _public} =
+      Catalog.create_public_payload(
+        %{name: "Public payload", template: "echo public", recipe_id: recipe.id},
+        [linux.id]
+      )
+
+    {:ok, _owned} =
+      Catalog.create_payload(
+        @owner,
+        %{name: "My payload", template: "echo mine"},
+        [linux.id]
       )
 
     {:ok, _view, html} = live(conn, ~p"/payloads")
 
-    assert html =~ "Payload"
+    assert html =~ "Public payload"
+    assert html =~ "My payload"
+    assert html =~ "Public catalog"
+    assert html =~ "Your editions"
     assert html =~ "Encode"
-    assert html =~ "unix"
+    assert html =~ "linux"
+    assert html =~ "Improve"
+    assert html =~ "Discard"
   end
 
-  test "creates a payload with tags", %{conn: conn} do
+  test "does not list another owner's editions", %{conn: conn} do
+    {:ok, _hidden} =
+      Catalog.create_payload("another-owner", %{name: "Hidden edition", template: "id"})
+
+    {:ok, _view, html} = live(conn, ~p"/payloads")
+
+    refute html =~ "Hidden edition"
+  end
+
+  test "keeps a second cookie's edition hidden and the public row visible", %{} do
+    {:ok, public} = Catalog.create_public_payload(%{name: "Shared public", template: "id"})
+    {:ok, edition} = Catalog.create_payload(@owner, %{name: "First cookie", template: "id"})
+    {:ok, _edition} = Catalog.update_payload(edition, @owner, %{name: "First cookie only"})
+
+    other_conn = owner_conn("other-owner-00000002")
+    {:ok, _view, html} = live(other_conn, ~p"/payloads")
+
+    assert html =~ public.name
+    refute html =~ "First cookie only"
+    assert Catalog.get_payload(public.id, "other-owner-00000002").owner_id == nil
+  end
+
+  test "creates a private payload with tags", %{conn: conn} do
+    unix = tag!("unix")
+    web = tag!("web")
+
     {:ok, view, _html} = live(conn, ~p"/payloads/new")
 
     view
@@ -30,32 +75,35 @@ defmodule RevkitWeb.PayloadLiveTest do
         "name" => "New payload",
         "description" => "A test",
         "template" => "echo hi",
-        "tags" => "unix, web"
+        "tags" => [to_string(unix.id), to_string(web.id)]
       }
     })
 
-    assert_redirect(view, ~p"/payloads")
+    assert [payload] = Catalog.list_owned_payloads(@owner)
+    assert_redirect(view, ~p"/payloads/#{payload.id}")
 
-    assert [payload] = Catalog.list_payloads()
     assert payload.name == "New payload"
     assert payload.description == "A test"
     assert payload.template == "echo hi"
+    assert payload.owner_id == @owner
     assert payload.tags |> Enum.map(& &1.name) |> Enum.sort() == ["unix", "web"]
   end
 
   test "shows validation errors and does not insert", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/payloads/new")
 
-    html =
-      render_submit(view, "save", %{"payload" => %{"name" => "", "template" => ""}})
+    html = render_submit(view, "save", %{"payload" => %{"name" => "", "template" => ""}})
 
     assert html =~ "can&#39;t be blank"
-    assert Catalog.list_payloads() == []
+    assert Catalog.list_owned_payloads(@owner) == []
   end
 
-  test "updates a payload", %{conn: conn} do
+  test "updates a private payload", %{conn: conn} do
+    unix = tag!("unix")
+    linux = tag!("linux")
+
     {:ok, payload} =
-      Catalog.create_payload_with_tags(%{name: "Old", template: "id"}, ["unix"])
+      Catalog.create_payload(@owner, %{name: "Old", template: "id"}, [unix.id])
 
     {:ok, view, _html} = live(conn, ~p"/payloads/#{payload.id}/edit")
 
@@ -65,34 +113,64 @@ defmodule RevkitWeb.PayloadLiveTest do
         "name" => "Updated",
         "description" => "",
         "template" => "whoami",
-        "tags" => "linux"
+        "tags" => [to_string(linux.id)]
       }
     })
 
-    assert_redirect(view, ~p"/payloads")
+    assert_redirect(view, ~p"/payloads/#{payload.id}")
 
-    updated = Catalog.get_payload!(payload.id)
+    updated = Catalog.get_payload!(payload.id, @owner)
     assert updated.name == "Updated"
     assert updated.template == "whoami"
     assert updated.tags |> Enum.map(& &1.name) == ["linux"]
   end
 
-  test "deletes a payload", %{conn: conn} do
-    {:ok, payload} = Catalog.create_payload(%{name: "Delete me", template: "id"})
+  test "improves a public payload into a private edition", %{conn: conn} do
+    linux = tag!("linux")
+    {:ok, public} = Catalog.create_public_payload(%{name: "Public", template: "id"}, [linux.id])
 
-    {:ok, view, html} = live(conn, ~p"/payloads")
-    assert html =~ "Delete me"
+    {:ok, view, _html} = live(conn, ~p"/payloads")
 
-    html = render_click(view, "delete", %{"id" => to_string(payload.id)})
+    view |> element("#improve-payload-#{public.id}") |> render_click()
 
-    refute html =~ "Delete me"
-    assert render(view) =~ "Payload deleted"
-    assert Catalog.list_payloads() == []
+    assert [edition] = Catalog.list_owned_payloads(@owner)
+    assert edition.source_payload_id == public.id
+    assert edition.owner_id == @owner
+    assert_redirect(view, ~p"/payloads/#{edition.id}/edit")
+
+    assert Catalog.get_payload!(public.id, @owner).owner_id == nil
+    assert Catalog.get_payload!(public.id, @owner).template == "id"
+    assert Enum.map(Catalog.get_payload!(public.id, @owner).tags, & &1.name) == ["linux"]
   end
 
-  test "searches payloads", %{conn: conn} do
-    {:ok, _payload} = Catalog.create_payload(%{name: "Alpha shell", template: "bash -i"})
-    {:ok, _payload} = Catalog.create_payload(%{name: "Beta", template: "nc"})
+  test "does not show a delete action for public payloads", %{conn: conn} do
+    {:ok, public} = Catalog.create_public_payload(%{name: "Public", template: "id"})
+
+    {:ok, view, _html} = live(conn, ~p"/payloads")
+
+    refute has_element?(view, "#discard-payload-#{public.id}")
+    refute has_element?(view, "#delete-payload-#{public.id}")
+  end
+
+  test "discards only the owner's edition", %{conn: conn} do
+    {:ok, public} = Catalog.create_public_payload(%{name: "Public", template: "id"})
+    {:ok, edition} = Catalog.create_payload(@owner, %{name: "Mine", template: "id"})
+
+    {:ok, view, _html} = live(conn, ~p"/payloads")
+
+    view |> element("#discard-payload-#{edition.id}") |> render_click()
+
+    assert render(view) =~ "Edition discarded"
+    assert Catalog.list_owned_payloads(@owner) == []
+    assert Catalog.get_payload!(public.id, @owner).id == public.id
+  end
+
+  test "searches only visible payloads", %{conn: conn} do
+    {:ok, _public} = Catalog.create_public_payload(%{name: "Alpha shell", template: "bash -i"})
+    {:ok, _owned} = Catalog.create_payload(@owner, %{name: "Beta", template: "nc"})
+
+    {:ok, _hidden} =
+      Catalog.create_payload("another-owner", %{name: "Beta hidden", template: "nc"})
 
     {:ok, view, _html} = live(conn, ~p"/payloads")
 
@@ -102,17 +180,17 @@ defmodule RevkitWeb.PayloadLiveTest do
     refute html =~ "Beta"
   end
 
-  test "toggles a payload favorite", %{conn: conn} do
-    {:ok, payload} = Catalog.create_payload(%{name: "Favorite", template: "id"})
+  test "toggles a favorite on a private payload", %{conn: conn} do
+    {:ok, payload} = Catalog.create_payload(@owner, %{name: "Favorite", template: "id"})
 
     {:ok, view, _html} = live(conn, ~p"/payloads")
 
     render_click(view, "toggle_favorite", %{"id" => to_string(payload.id)})
 
-    assert Catalog.get_payload!(payload.id).favorite == true
+    assert Catalog.get_payload!(payload.id, @owner).favorite == true
   end
 
-  test "creates a payload with target metadata and notes", %{conn: conn} do
+  test "creates a private payload with target metadata and notes", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/payloads/new")
 
     view
@@ -128,9 +206,7 @@ defmodule RevkitWeb.PayloadLiveTest do
       }
     })
 
-    assert_redirect(view, ~p"/payloads")
-
-    payload = Catalog.list_payloads() |> hd()
+    payload = Catalog.list_owned_payloads(@owner) |> hd()
     assert payload.target_os == "linux"
     assert payload.target_shell == "bash"
     assert payload.target_tools == ["base64", "curl"]
@@ -138,9 +214,11 @@ defmodule RevkitWeb.PayloadLiveTest do
     assert payload.favorite == true
   end
 
-  test "shows payload context and template", %{conn: conn} do
+  test "shows a public payload's context and template", %{conn: conn} do
+    linux = tag!("linux")
+
     {:ok, payload} =
-      Catalog.create_payload_with_tags(
+      Catalog.create_public_payload(
         %{
           name: "Shown payload",
           description: "Use with an outbound listener",
@@ -148,7 +226,7 @@ defmodule RevkitWeb.PayloadLiveTest do
           notes: "Authorized testing only",
           target_shell: "bash"
         },
-        ["linux"]
+        [linux.id]
       )
 
     {:ok, _view, html} = live(conn, ~p"/payloads/#{payload.id}")
@@ -158,19 +236,37 @@ defmodule RevkitWeb.PayloadLiveTest do
     assert html =~ "id {{HOST}}"
     assert html =~ "Authorized testing only"
     assert html =~ "linux"
+    assert html =~ "Public catalog"
+    assert html =~ "Improve for me"
+  end
+
+  test "shows a private edition with its source and editing controls", %{conn: conn} do
+    {:ok, public} = Catalog.create_public_payload(%{name: "Public", template: "id"})
+    {:ok, edition} = Catalog.improve_payload(public, @owner)
+
+    {:ok, _view, html} = live(conn, ~p"/payloads/#{edition.id}")
+
+    assert html =~ "Your edition"
+    assert html =~ "Based on public"
+    assert html =~ "Public"
+    assert html =~ "Edit my edition"
+    assert html =~ "Discard edition"
   end
 
   test "search filters by favorites and tag", %{conn: conn} do
+    linux = tag!("linux")
+    web = tag!("web")
+
     {:ok, _payload} =
-      Catalog.create_payload_with_tags(
+      Catalog.create_payload(
+        @owner,
         %{name: "Favorite Linux", template: "id", favorite: true},
-        ["linux"]
+        [linux.id]
       )
 
-    {:ok, _payload} = Catalog.create_payload_with_tags(%{name: "Other", template: "id"}, ["web"])
+    {:ok, _payload} = Catalog.create_payload(@owner, %{name: "Other", template: "id"}, [web.id])
 
     {:ok, view, _html} = live(conn, ~p"/payloads")
-    [linux] = Enum.filter(Catalog.list_tags(), &(&1.name == "linux"))
 
     html = render_change(view, "search", %{"q" => "", "favorites" => "true"})
     assert html =~ "Favorite Linux"
@@ -182,7 +278,7 @@ defmodule RevkitWeb.PayloadLiveTest do
   end
 
   test "links to the generator with the payload id", %{conn: conn} do
-    {:ok, payload} = Catalog.create_payload(%{name: "Payload", template: "id"})
+    {:ok, payload} = Catalog.create_payload(@owner, %{name: "Payload", template: "id"})
 
     {:ok, _view, html} = live(conn, ~p"/payloads")
 

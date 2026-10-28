@@ -3,11 +3,14 @@ defmodule RevkitWeb.PayloadLive.Form do
 
   alias Revkit.Catalog
   alias Revkit.Catalog.Payload
-  alias RevkitWeb.TargetParams
+  alias RevkitWeb.{TargetParams, UI}
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, :recipes, Catalog.list_recipes())}
+    {:ok,
+     socket
+     |> assign(:recipes, Catalog.list_recipes(socket.assigns.owner_id))
+     |> assign(:tags, Catalog.list_tags())}
   end
 
   @impl true
@@ -20,17 +23,17 @@ defmodule RevkitWeb.PayloadLive.Form do
 
     socket
     |> assign(:payload, payload)
-    |> assign(:tag_names, "")
+    |> assign(:selected_tag_ids, [])
     |> assign(:target_tools, "")
     |> assign(:form, to_form(Payload.changeset(payload, %{})))
   end
 
   defp apply_action(socket, :edit, %{"id" => id}) do
-    payload = Catalog.get_payload!(id)
+    payload = Catalog.get_owned_payload!(id, socket.assigns.owner_id)
 
     socket
     |> assign(:payload, payload)
-    |> assign(:tag_names, Enum.map_join(payload.tags, ", ", & &1.name))
+    |> assign(:selected_tag_ids, Enum.map(payload.tags, & &1.id))
     |> assign(:target_tools, Enum.join(payload.target_tools, ", "))
     |> assign(:form, to_form(Payload.changeset(payload, %{})))
   end
@@ -47,7 +50,7 @@ defmodule RevkitWeb.PayloadLive.Form do
     {:noreply,
      assign(socket,
        form: to_form(changeset),
-       tag_names: Map.get(params, "tags", socket.assigns.tag_names),
+       selected_tag_ids: parse_tag_ids(params["tags"]),
        target_tools: Map.get(params, "target_tools_text", socket.assigns.target_tools)
      )}
   end
@@ -60,40 +63,64 @@ defmodule RevkitWeb.PayloadLive.Form do
   defp save_payload(socket, :new, params) do
     attrs = TargetParams.normalize(params)
 
-    case Catalog.create_payload_with_tags(attrs, params["tags"]) do
-      {:ok, _payload} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Payload created")
-         |> push_navigate(to: ~p"/payloads")}
-
-      {:error, changeset} ->
-        {:noreply,
-         assign(socket,
-           form: to_form(changeset, action: :insert),
-           tag_names: params["tags"] || "",
-           target_tools: params["target_tools_text"] || ""
-         )}
-    end
+    socket.assigns.owner_id
+    |> Catalog.create_payload(attrs, params["tags"] || [])
+    |> handle_save_result(socket, params)
   end
 
   defp save_payload(socket, :edit, params) do
     attrs = TargetParams.normalize(params)
 
-    case Catalog.update_payload_with_tags(socket.assigns.payload, attrs, params["tags"]) do
-      {:ok, _payload} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Payload updated")
-         |> push_navigate(to: ~p"/payloads")}
+    Catalog.update_payload(
+      socket.assigns.payload,
+      socket.assigns.owner_id,
+      attrs,
+      params["tags"] || []
+    )
+    |> handle_save_result(socket, params)
+  end
 
-      {:error, changeset} ->
-        {:noreply,
-         assign(socket,
-           form: to_form(changeset, action: :update),
-           tag_names: params["tags"] || "",
-           target_tools: params["target_tools_text"] || ""
-         )}
-    end
+  defp handle_save_result({:ok, payload}, socket, _params) do
+    {:noreply,
+     socket
+     |> put_flash(
+       :info,
+       if(socket.assigns.live_action == :new, do: "Payload created", else: "Payload updated")
+     )
+     |> push_navigate(to: ~p"/payloads/#{payload.id}")}
+  end
+
+  defp handle_save_result({:error, :limit_reached}, socket, params) do
+    {:noreply,
+     socket
+     |> put_flash(:error, "You have reached the private edition limit")
+     |> assign(:selected_tag_ids, parse_tag_ids(params["tags"]))}
+  end
+
+  defp handle_save_result({:error, %Ecto.Changeset{} = changeset}, socket, params) do
+    action = if socket.assigns.live_action == :new, do: :insert, else: :update
+
+    {:noreply,
+     assign(socket,
+       form: to_form(changeset, action: action),
+       selected_tag_ids: parse_tag_ids(params["tags"]),
+       target_tools: params["target_tools_text"] || ""
+     )}
+  end
+
+  defp handle_save_result({:error, _reason}, socket, _params) do
+    {:noreply, put_flash(socket, :error, "Could not save payload")}
+  end
+
+  defp parse_tag_ids(tag_ids) do
+    tag_ids
+    |> List.wrap()
+    |> Enum.reduce([], fn tag_id, acc ->
+      case Integer.parse(to_string(tag_id)) do
+        {id, ""} -> [id | acc]
+        _other -> acc
+      end
+    end)
+    |> Enum.reverse()
   end
 end

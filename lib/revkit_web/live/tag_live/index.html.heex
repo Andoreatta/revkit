@@ -1,57 +1,37 @@
 <Layouts.app flash={@flash} current={:tags}>
   <.header>
     Tags
-    <:subtitle>Shared curation labels for payloads and recipes.</:subtitle>
+    <:subtitle>
+      A fixed vocabulary shared by the public catalog and every private edition.
+    </:subtitle>
+    <:actions>
+      <span class="badge badge-outline badge-sm">
+        {length(@tags)} / {Revkit.Limits.max_tag_vocabulary()} tags
+      </span>
+    </:actions>
   </.header>
 
   <div class="mx-auto max-w-3xl space-y-6">
-    <section class="card border border-base-300 bg-base-100 shadow-sm">
-      <div class="card-body gap-4">
-        <h2 class="card-title text-base">New tag</h2>
-        <.form
-          for={@new_form}
-          id="new-tag-form"
-          phx-submit="create"
-          class="flex flex-col gap-2 sm:flex-row sm:items-end"
-        >
-          <.input field={@new_form[:name]} type="text" label="Name" class="w-full input" />
-          <button type="submit" class="btn btn-primary" phx-disable-with="Creating…">
-            Create
-          </button>
-        </.form>
-      </div>
-    </section>
+    <div class="rounded-box border border-base-300 bg-base-100 p-4 text-sm text-base-content/70 shadow-sm">
+      <p>
+        Tags are read-only and capped at {Revkit.Limits.max_tag_vocabulary()} entries. Each
+        payload or recipe may use up to {Revkit.Limits.max_tags()} tags.
+      </p>
+    </div>
 
     <UI.empty_state :if={@tags == []} icon="hero-tag" title="No tags yet">
-      <:body>Create tags here or type them while editing a payload or recipe.</:body>
+      <:body>The vocabulary is loaded with the curated catalog.</:body>
     </UI.empty_state>
 
     <div :if={@tags != []} class="grid gap-3 sm:grid-cols-2">
-      <div
-        :for={tag <- @tags}
-        class="card border border-base-300 bg-base-100 shadow-sm"
-      >
-        <div class="card-body gap-3 p-4">
-          <form id={"rename-tag-#{tag.id}"} phx-submit="rename" class="flex flex-wrap gap-2">
-            <input type="hidden" name="tag_id" value={tag.id} />
-            <input
-              type="text"
-              name="tag[name]"
-              value={tag.name}
-              class="input input-sm min-w-0 flex-1"
-              aria-label={"Tag name: #{tag.name}"}
-            />
-            <button type="submit" class="btn btn-ghost btn-sm">Rename</button>
-            <button
-              type="button"
-              class="btn btn-ghost btn-sm text-error"
-              phx-click="delete"
-              phx-value-id={tag.id}
-              data-confirm="Delete this tag from all payloads and recipes?"
-            >
-              Delete
-            </button>
-          </form>
+      <div :for={entry <- @tags} class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body gap-2 p-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="badge badge-ghost">{entry.tag.name}</span>
+            <span class="text-xs text-base-content/50">
+              {entry.payloads} payloads · {entry.recipes} recipes
+            </span>
+          </div>
         </div>
       </div>
     </div>
