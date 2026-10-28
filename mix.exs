@@ -10,6 +10,7 @@ defmodule Revkit.MixProject do
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
+      dialyzer: dialyzer(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
       listeners: [Phoenix.CodeReloader]
     ]
@@ -71,7 +72,16 @@ defmodule Revkit.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
+    ]
+  end
+
+  defp dialyzer do
+    [
+      plt_add_apps: [:mix, :ex_unit],
+      plt_local_path: "priv/plts",
+      plt_core_path: "priv/plts"
     ]
   end
 
@@ -99,7 +109,8 @@ defmodule Revkit.MixProject do
         "deps.unlock --unused",
         "format",
         "credo",
-        "test"
+        "test",
+        "dialyzer"
       ]
     ]
   end
