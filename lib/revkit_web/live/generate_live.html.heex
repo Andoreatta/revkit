@@ -55,82 +55,11 @@
               </div>
             </div>
 
-            <div class="space-y-2">
-              <div class="flex items-center justify-between">
-                <h3 class="text-sm font-semibold">Transform chain</h3>
-                <button
-                  type="button"
-                  id="generate-add-step"
-                  class="btn btn-ghost btn-sm"
-                  phx-click="add_step"
-                >
-                  <.icon name="hero-plus" class="size-4" /> Add transform
-                </button>
-              </div>
-
-              <p :if={@steps == []} class="text-sm text-base-content/60">
-                No transforms yet. The payload passes through unchanged.
-              </p>
-
-              <div
-                :for={{step, index} <- Enum.with_index(@steps)}
-                id={"generate-step-#{index}"}
-                class="flex flex-col gap-2 rounded-box bg-base-200 p-3 sm:flex-row sm:items-center"
-              >
-                <select
-                  name={"steps[#{index}][key]"}
-                  class="w-full select select-sm sm:flex-1"
-                >
-                  <option value="">Select a transform</option>
-                  <option
-                    :if={step.key != "" and is_nil(Transforms.fetch(step.key))}
-                    value={step.key}
-                    selected
-                  >
-                    {step.key} (unknown)
-                  </option>
-                  <option
-                    :for={transform <- Transforms.all()}
-                    value={transform.key()}
-                    selected={step.key == Atom.to_string(transform.key())}
-                  >
-                    {transform.label()}
-                  </option>
-                </select>
-
-                <div class="flex gap-1">
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-xs"
-                    phx-click="move_step"
-                    phx-value-id={step.id}
-                    phx-value-direction="up"
-                    aria-label="Move up"
-                  >
-                    <.icon name="hero-arrow-up" class="size-4" />
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-xs"
-                    phx-click="move_step"
-                    phx-value-id={step.id}
-                    phx-value-direction="down"
-                    aria-label="Move down"
-                  >
-                    <.icon name="hero-arrow-down" class="size-4" />
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-xs text-error"
-                    phx-click="remove_step"
-                    phx-value-id={step.id}
-                    aria-label="Remove step"
-                  >
-                    <.icon name="hero-x-mark" class="size-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
+            <StepEditor.step_editor
+              steps={@steps}
+              name_prefix="steps"
+              id_prefix="generate"
+            />
           </form>
 
           <div class="mt-4 border-t border-base-300 pt-4">

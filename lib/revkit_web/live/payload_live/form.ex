@@ -3,6 +3,7 @@ defmodule RevkitWeb.PayloadLive.Form do
 
   alias Revkit.Catalog
   alias Revkit.Catalog.Payload
+  alias RevkitWeb.TargetParams
 
   @impl true
   def mount(_params, _session, socket) do
@@ -36,7 +37,7 @@ defmodule RevkitWeb.PayloadLive.Form do
 
   @impl true
   def handle_event("validate", %{"payload" => params}, socket) do
-    attrs = normalize_params(params)
+    attrs = TargetParams.normalize(params)
 
     changeset =
       socket.assigns.payload
@@ -57,7 +58,7 @@ defmodule RevkitWeb.PayloadLive.Form do
   end
 
   defp save_payload(socket, :new, params) do
-    attrs = normalize_params(params)
+    attrs = TargetParams.normalize(params)
 
     case Catalog.create_payload_with_tags(attrs, params["tags"]) do
       {:ok, _payload} ->
@@ -77,7 +78,7 @@ defmodule RevkitWeb.PayloadLive.Form do
   end
 
   defp save_payload(socket, :edit, params) do
-    attrs = normalize_params(params)
+    attrs = TargetParams.normalize(params)
 
     case Catalog.update_payload_with_tags(socket.assigns.payload, attrs, params["tags"]) do
       {:ok, _payload} ->
@@ -94,19 +95,5 @@ defmodule RevkitWeb.PayloadLive.Form do
            target_tools: params["target_tools_text"] || ""
          )}
     end
-  end
-
-  defp normalize_params(params) do
-    tools =
-      params
-      |> Map.get("target_tools_text", "")
-      |> String.split(",")
-      |> Enum.map(&String.trim/1)
-      |> Enum.reject(&(&1 == ""))
-      |> Enum.uniq()
-
-    params
-    |> Map.delete("target_tools_text")
-    |> Map.put("target_tools", tools)
   end
 end

@@ -3,7 +3,7 @@ defmodule RevkitWeb.RecipeLive.Form do
 
   alias Revkit.Catalog
   alias Revkit.Catalog.Recipe
-  alias Revkit.Engine.Transforms
+  alias RevkitWeb.{StepEditor, TargetParams}
 
   @impl true
   def mount(_params, _session, socket) do
@@ -31,23 +31,15 @@ defmodule RevkitWeb.RecipeLive.Form do
 
     socket
     |> assign(:recipe, recipe)
-    |> assign(:steps, Enum.map(recipe.steps, &to_editor_step/1))
+    |> assign(:steps, StepEditor.to_editor_steps(recipe.steps))
     |> assign(:tag_names, Enum.map_join(recipe.tags, ", ", & &1.name))
     |> assign(:target_tools, Enum.join(recipe.target_tools, ", "))
     |> assign(:form, to_form(Recipe.changeset(recipe, %{})))
   end
 
-  defp to_editor_step(step) do
-    %{
-      id: System.unique_integer([:positive]),
-      key: step["key"] || step[:key] || "",
-      options: step["options"] || step[:options] || %{}
-    }
-  end
-
   @impl true
   def handle_event("validate", %{"recipe" => params}, socket) do
-    steps = merge_steps(socket.assigns.steps, params["steps"])
+    steps = StepEditor.merge(socket.assigns.steps, params["steps"])
 
     changeset =
       socket.assigns.recipe
@@ -65,39 +57,23 @@ defmodule RevkitWeb.RecipeLive.Form do
 
   @impl true
   def handle_event("add_step", _params, socket) do
-    step = %{id: System.unique_integer([:positive]), key: "", options: %{}}
-
-    {:noreply, assign(socket, :steps, socket.assigns.steps ++ [step])}
+    {:noreply, assign(socket, :steps, StepEditor.add(socket.assigns.steps))}
   end
 
   @impl true
   def handle_event("remove_step", %{"id" => id}, socket) do
-    id = String.to_integer(id)
-    steps = Enum.reject(socket.assigns.steps, &(&1.id == id))
-
-    {:noreply, assign(socket, :steps, steps)}
+    {:noreply, assign(socket, :steps, StepEditor.remove(socket.assigns.steps, id))}
   end
 
   @impl true
   def handle_event("move_step", %{"id" => id, "direction" => direction}, socket) do
-    id = String.to_integer(id)
-    steps = socket.assigns.steps
-    index = Enum.find_index(steps, &(&1.id == id))
-
-    steps =
-      cond do
-        is_nil(index) -> steps
-        direction == "up" and index > 0 -> swap(steps, index, index - 1)
-        direction == "down" and index < length(steps) - 1 -> swap(steps, index, index + 1)
-        true -> steps
-      end
-
-    {:noreply, assign(socket, :steps, steps)}
+    {:noreply,
+     assign(socket, :steps, StepEditor.move(socket.assigns.steps, id, direction))}
   end
 
   @impl true
   def handle_event("save", %{"recipe" => params}, socket) do
-    steps = merge_steps(socket.assigns.steps, params["steps"])
+    steps = StepEditor.merge(socket.assigns.steps, params["steps"])
     result = save_recipe(socket, attrs(params, steps), params["tags"])
 
     handle_save_result(socket, result, params, steps)
@@ -131,41 +107,9 @@ defmodule RevkitWeb.RecipeLive.Form do
     )
   end
 
-  defp merge_steps(steps, step_params) when is_map(step_params) do
-    steps
-    |> Enum.with_index()
-    |> Enum.map(fn {step, index} ->
-      case Map.get(step_params, Integer.to_string(index)) do
-        nil -> step
-        params -> %{step | key: params["key"] || ""}
-      end
-    end)
-  end
-
-  defp merge_steps(steps, _step_params), do: steps
-
   defp attrs(params, steps) do
-    tools =
-      params
-      |> Map.get("target_tools_text", "")
-      |> String.split(",")
-      |> Enum.map(&String.trim/1)
-      |> Enum.reject(&(&1 == ""))
-      |> Enum.uniq()
-
     params
-    |> Map.delete("target_tools_text")
-    |> Map.put("target_tools", tools)
-    |> Map.put("steps", Enum.map(steps, &step_attrs/1))
-  end
-
-  defp step_attrs(step) do
-    %{"key" => step.key || "", "options" => step.options || %{}}
-  end
-
-  defp swap(steps, left, right) do
-    steps
-    |> List.replace_at(left, Enum.at(steps, right))
-    |> List.replace_at(right, Enum.at(steps, left))
+    |> TargetParams.normalize()
+    |> Map.put("steps", StepEditor.to_attrs(steps))
   end
 end
