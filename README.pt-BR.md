@@ -90,7 +90,8 @@ docker compose down -v  # apaga o volume
 ## Documentação
 
 - [Documentação completa (PDF)](docs/documentacao.pdf)
-- [Diagramas do projeto](docs/diagramas/)
+- [Diagramas do projeto](docs/diagramas/) — caso de uso, DER, arquitetura,
+  sequência e implantação.
 
 O PDF contém os Requisitos Funcionais e Não Funcionais, o Diagrama de Caso de
 Uso, o DER e os demais diagramas de apoio.

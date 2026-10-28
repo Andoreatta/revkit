@@ -1,0 +1,42 @@
+@startuml
+title RevKit — Arquitetura em Camadas
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+
+package "Interface web" {
+  [RevkitWeb\nPhoenix / LiveView] as web
+  [Plug.Owner\ncookie de sessão] as owner
+}
+
+package "Persistência" {
+  [Revkit.Catalog\ncontexto] as catalog
+  [Revkit.Repo] as repo
+  database "SQLite\nrevkit_dev.db" as db
+}
+
+package "Motor puro" {
+  [Revkit.Engine.Template] as template
+  [Revkit.Engine.Chain] as chain
+  [Revkit.Engine.Transforms] as transforms
+  [Revkit.Engine.Validator] as validator
+}
+
+owner --> web : injeta owner_id
+web --> catalog : consulta / persiste
+web --> template : renderiza
+web --> chain : executa
+web --> validator : valida
+chain --> transforms : aplica
+catalog --> repo : usa
+repo --> db : SQL
+
+note bottom of web
+  Nenhuma string gerada é executada.
+end note
+
+note bottom of transforms
+  O motor não depende de Ecto,
+  Phoenix, Repo ou estado de processo.
+end note
+
+@enduml

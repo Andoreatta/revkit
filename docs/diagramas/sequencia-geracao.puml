@@ -1,0 +1,41 @@
+@startuml
+title RevKit — Sequência de Geração e Pré-visualização
+skinparam maxMessageSize 120
+
+actor "Usuário" as user
+participant "GenerateLive" as live
+participant "Template" as template
+participant "Transforms" as transforms
+participant "Chain" as chain
+participant "Validator" as validator
+participant "Catalog" as catalog
+participant "Repo" as repo
+database "SQLite" as db
+
+user -> live : altera template, variáveis ou cadeia
+live -> template : render(template, variáveis)
+template --> live : string renderizada
+live -> transforms : resolve(steps)
+transforms --> live : módulos resolvidos
+live -> chain : run(string, cadeia)
+chain -> transforms : apply(transformação)
+transforms --> chain : string transformada
+chain --> live : resultado
+live -> validator : validate(cadeia, alvo)
+validator --> live : requisitos, avisos e pontos de atenção
+live --> user : pré-visualização e avisos
+
+note over live, validator : A pré-visualização não grava no banco.
+
+opt Salvar receita
+  user -> live : solicita salvar receita
+  live -> catalog : create_recipe(owner_id, dados, tags)
+  catalog -> repo : insert
+  repo -> db : SQL
+  db --> repo : ok
+  repo --> catalog : receita
+  catalog --> live : {:ok, receita}
+  live --> user : receita salva
+end
+
+@enduml

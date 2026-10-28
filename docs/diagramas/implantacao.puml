@@ -1,0 +1,31 @@
+@startuml
+title RevKit — Implantação
+skinparam nodeStyle rectangle
+skinparam componentStyle rectangle
+
+actor "Usuário" as user
+node "Navegador" as browser
+
+node "Docker" as docker {
+  node "Container revkit" {
+    [Release Elixir\nBandit / Phoenix] as app
+    database "SQLite\n/data/revkit.db" as db
+  }
+
+  node "Volume revkit_data" as volume {
+    artifact "revkit.db" as dbfile
+  }
+}
+
+user --> browser : acessa
+browser --> app : HTTP/WebSocket
+app --> db : Ecto / SQLite
+db --> dbfile : persiste
+
+note right of docker
+  Uma única instância.
+  SQLite single-writer.
+  Em produção, usar proxy reverso com TLS.
+end note
+
+@enduml

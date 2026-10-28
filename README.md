@@ -87,7 +87,8 @@ docker compose down -v  # deletes the volume
 ## Documentation
 
 - [Full documentation (PDF)](docs/documentacao.pdf)
-- [Project diagrams](docs/diagramas/)
+- [Project diagrams](docs/diagramas/) — Use Case, DER, architecture,
+  sequence, and deployment (Portuguese labels).
 
 The PDF contains the Functional and Non-Functional Requirements, the Use Case
 Diagram, the ERD, and the supporting diagrams.

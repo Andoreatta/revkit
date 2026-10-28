@@ -1,0 +1,38 @@
+@startuml
+title RevKit — Diagrama de Caso de Uso
+left to right direction
+skinparam packageStyle rectangle
+
+actor "Usuário" as usuario
+
+rectangle "RevKit" {
+  usecase "Gerar payload" as UC1
+  usecase "Salvar receita de geração" as UC2
+  usecase "Reabrir receita salva" as UC3
+  usecase "Criar edição privada" as UC4
+  usecase "Pesquisar e filtrar catálogo" as UC5
+}
+
+usuario --> UC1
+usuario --> UC2
+usuario --> UC3
+usuario --> UC4
+usuario --> UC5
+
+note right of UC1
+  Inclui pré-visualização,
+  validação de compatibilidade
+  e cópia do resultado.
+end note
+
+note right of UC4
+  A edição privada pode ser
+  editada ou descartada sem
+  alterar o catálogo público.
+end note
+
+note bottom of UC5
+  Filtros por favoritos e tags.
+end note
+
+@enduml

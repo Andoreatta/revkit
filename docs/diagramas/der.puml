@@ -1,0 +1,89 @@
+@startuml
+title RevKit — DER
+hide circle
+
+entity "payloads" as payloads {
+  * id : INTEGER <<PK>>
+  --
+  * name : TEXT
+  description : TEXT
+  * template : TEXT
+  target_os : TEXT
+  target_shell : TEXT
+  * target_tools : JSON
+  notes : TEXT
+  * favorite : BOOLEAN
+  owner_id : TEXT
+  recipe_id : INTEGER <<FK>>
+  source_payload_id : INTEGER <<FK>>
+  * inserted_at : DATETIME
+  * updated_at : DATETIME
+}
+
+entity "recipes" as recipes {
+  * id : INTEGER <<PK>>
+  --
+  * name : TEXT
+  description : TEXT
+  * template : TEXT
+  * variables : JSON
+  * steps : JSON
+  notes : TEXT
+  * favorite : BOOLEAN
+  target_os : TEXT
+  target_shell : TEXT
+  * target_tools : JSON
+  owner_id : TEXT
+  payload_id : INTEGER <<FK>>
+  source_recipe_id : INTEGER <<FK>>
+  * inserted_at : DATETIME
+  * updated_at : DATETIME
+}
+
+entity "tags" as tags {
+  * id : INTEGER <<PK>>
+  --
+  * name : TEXT <<UNIQUE>>
+  * inserted_at : DATETIME
+  * updated_at : DATETIME
+}
+
+entity "payloads_tags" as payloads_tags {
+  * payload_id : INTEGER <<PK>>
+  * tag_id : INTEGER <<PK>>
+}
+
+entity "recipes_tags" as recipes_tags {
+  * recipe_id : INTEGER <<PK>>
+  * tag_id : INTEGER <<PK>>
+}
+
+payloads ||--o{ payloads_tags
+tags ||--o{ payloads_tags
+
+recipes ||--o{ recipes_tags
+tags ||--o{ recipes_tags
+
+payloads |o--o{ recipes : "origem da receita\n(recipes.payload_id)"
+payloads }o--o| recipes : "receita padrão\n(payloads.recipe_id)"
+
+payloads |o--o{ payloads : "edição privada\n(source_payload_id)"
+recipes |o--o{ recipes : "edição privada\n(source_recipe_id)"
+
+note left of payloads
+  owner_id nulo = catálogo público.
+  owner_id preenchido = edição
+  privada vinculada ao cookie.
+end note
+
+note bottom of payloads_tags
+  Chave primária composta;
+  payload_id e tag_id também são FKs.
+end note
+
+note bottom of recipes_tags
+  Chave primária composta;
+  recipe_id e tag_id também são FKs.
+end note
+
+@enduml
