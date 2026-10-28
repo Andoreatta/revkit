@@ -1,6 +1,6 @@
-# Revkit
+# RevKit
 
-Revkit generates and validates offensive-security payload strings: reverse
+RevKit generates and validates offensive-security payload strings: reverse
 shells, wrappers, and encoders. It is a **pure-string pipeline** — it never
 executes, spawns, or shells out to a payload.
 
@@ -21,6 +21,9 @@ no JSON API and no authentication by design.
   metadata, notes, tags, and favorite status
 - Recipe reopen, fork, search, and payload/recipe search
 - Tag management (create, rename, delete) plus payload/recipe tag assignment
+- Favorite and tag filters in the payload and recipe catalogs
+- Responsive catalog pages, context pages, and a mobile navigation menu
+- Curated starter catalog with target assumptions and usage context
 - Nonce-based Content-Security-Policy
 - Quality gates: Credo, Sobelow, Dialyzer, ExUnit
 
@@ -67,6 +70,7 @@ Useful commands:
 docker compose logs -f revkit
 docker compose down          # keeps the SQLite volume
 docker compose down -v       # deletes the database volume
+docker compose exec revkit /app/bin/seed   # load the curated demo catalog
 ```
 
 The image is a multi-stage production build: assets are compiled in the builder,
@@ -153,11 +157,34 @@ docker build \
 | `/`, `/generate` | Generator and live preview |
 | `/payloads` | Payload catalog |
 | `/payloads/new`, `/payloads/:id/edit` | Payload forms |
+| `/payloads/:id` | Payload context page |
 | `/recipes` | Saved recipe snapshots |
 | `/recipes/new`, `/recipes/:id/edit` | Recipe forms |
+| `/recipes/:id` | Recipe snapshot page |
 | `/tags` | Tag curation |
 | `/health` | Container liveness check |
 | `/dev/dashboard` | LiveDashboard, dev only |
+
+## Starter catalog
+
+`mix setup` and `mix ecto.reset` load an idempotent demo catalog:
+
+- Bash TCP, netcat FIFO, Python 3, Socat PTY, PowerShell, Bash bind,
+  netcat bind, and Perl reverse/bind templates
+- Base64, URL-encode, and Bash-wrapper recipes, including transport-encoded
+  variants
+- Tags, favorites, notes, target assumptions, and a “when to use” description
+  for every entry
+
+The seeds are templates for **authorized labs, CTFs, and scoped engagements**.
+They are strings only; RevKit never executes them. Encoded recipes are transport
+payloads and must be decoded before use.
+
+For Docker, load the same catalog once with:
+
+```bash
+docker compose exec revkit /app/bin/seed
+```
 
 ## Architecture
 

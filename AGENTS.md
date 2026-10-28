@@ -1,4 +1,4 @@
-# Revkit
+# RevKit
 
 Phoenix 1.8 + LiveView 1.2 app (Elixir ~> 1.17) with a browser UI.
 Persistence is SQLite via `ecto_sqlite3`, not Postgres. Assets are Tailwind v4 +
@@ -65,16 +65,20 @@ reintroduce ad-hoc lint/type/security commands outside the precommit alias.
   `header`, `icon`. `RevkitWeb.Layouts` — `app/1`, `flash_group/1`,
   `theme_toggle/1`, plus `layouts/root.html.heex`.
 - `lib/revkit_web/live/` — `GenerateLive` (`/` and `/generate`), `PayloadLive.Index`/
-  `Form` (`/payloads`), `RecipeLive.Index`/`Form` (`/recipes`), and
-  `TagLive.Index` (`/tags`). GenerateLive's `phx-change` handler updates the
+  `Form`/`Show` (`/payloads`), `RecipeLive.Index`/`Form`/`Show` (`/recipes`),
+  and `TagLive.Index` (`/tags`). GenerateLive's `phx-change` handler updates the
   template/variable/chain form and `:preview` but never calls Catalog or Repo.
   CRUD forms own their form assigns.
+- `lib/revkit_web/components/step_editor.ex` — shared ordered transform editor
+  used by the generator and recipe form.
+- `lib/revkit_web/components/ui.ex` — small shared presentation components
+  (empty state, target/tag badges, favorite button, code block).
 - New LiveViews belong in `lib/revkit_web/live/` as `RevkitWeb.XLive`; routes can
   use `live "/x", XLive` because the browser scope is aliased to `RevkitWeb`.
 - `Dockerfile`, `compose.yaml`, `.env.example`, and `docker/entrypoint.sh` — the
   production image is a multi-stage Elixir release running as a non-root user.
   `lib/revkit/release.ex` runs migrations inside the release; the entrypoint
-  migrates, then starts the server.
+  migrates, then starts the server. `bin/seed` loads the curated demo catalog.
 
 ## Revkit Architecture (domain rules)
 
@@ -116,6 +120,10 @@ the design collapses.
   `alert`, `table`, `fieldset`, `input`, `select`, `checkbox`, `textarea`). Match
   that style instead of hand-rolling equivalents. The `light` (default) and
   `dark` themes are defined in `assets/css/app.css`.
+- Branding is **RevKit** in the UI; module names remain `Revkit.*`. The shell is
+  a responsive `max-w-7xl` layout with a mobile navigation dropdown, shared
+  `RevkitWeb.UI` components, and a terminal-prompt logo in
+  `priv/static/images/logo.svg`.
 - Quality gates: Credo runs strict from `.credo.exs`; do not disable checks
   without a comment explaining why. Sobelow runs with `--skip`, so only
   annotated `# sobelow_skip` findings are suppressed. Dialyzer must stay at
