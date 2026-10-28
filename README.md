@@ -9,7 +9,7 @@ RevKit is a Phoenix/LiveView payload studio for composing, validating, and
 copying offensive-security payload strings for authorized testing. It is a
 pure-string pipeline: it never executes or spawns a payload.
 
-This is an individual course project for Software Development I and II.
+This is a two-person course project for Software Development I and II.
 
 ## Status
 

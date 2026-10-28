@@ -9,8 +9,8 @@ fluxo puramente textual: nada é executado.
 ## Identificação
 
 - **Disciplina:** Projeto de Desenvolvimento de Software I e II
-- **Modalidade:** Individual
-- **Autor:** Lucas Andreatta
+- **Modalidade:** Dupla
+- **Autores:** Lucas Andreatta e Leandro Sakae Kobayashi Ostruka
 - **Repositório:** https://github.com/andoreatta/revkit
 
 ## Status

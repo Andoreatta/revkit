@@ -1,6 +1,6 @@
 #set document(
   title: "RevKit — Estúdio de Payloads para Testes Autorizados",
-  author: "Lucas Andreatta",
+  author: "Lucas Andreatta; Leandro Sakae Kobayashi Ostruka",
 )
 
 #set page(
@@ -59,9 +59,9 @@
 
 #align(center)[
   #set text(size: 10.5pt)
-  Autor: *Lucas Andreatta* \
+  Autores: *Lucas Andreatta e Leandro Sakae Kobayashi Ostruka* \
   Professor: *Fernando Nakagawa* \
-  Modalidade: *Individual* \
+  Modalidade: *Dupla* \
   Repositório: #link("https://github.com/andoreatta/revkit")[https://github.com/andoreatta/revkit]
 ]
 
@@ -478,14 +478,14 @@ autorizados, com catálogo público, edições privadas, receitas reproduzíveis
 pré-visualização, validação e cópia. A implementação manteve a geração de
 strings separada da execução e documentou as decisões de escopo e segurança.
 
-Aprendi a importância de separar um domínio puro das camadas de interface e
+Aprendemos a importância de separar um domínio puro das camadas de interface e
 persistência. Essa separação tornou o motor simples de testar e permitiu que a
-pré-visualização no LiveView fosse rápida e previsível. Também aprofundei o uso
+pré-visualização no LiveView fosse rápida e previsível. Também aprofundamos o uso
 de LiveView para estado, formulários e atualizações em tempo real, de Ecto e
 SQLite para migrations e consultas com escopo, e de testes automatizados para
 verificar comportamentos de cookie.
 
-Aprendi, ainda, que decisões de produto afetam a arquitetura: tornar o catálogo
+Aprendemos, ainda, que decisões de produto afetam a arquitetura: tornar o catálogo
 público somente leitura exigiu um modelo de edições privadas; limitar tags e
 campos exigiu uma fonte única de limites; e a ausência de autenticação tornou
 necessário documentar claramente que o cookie não é uma barreira de segurança.
