@@ -1,6 +1,9 @@
 defmodule RevkitWeb.Router do
   use RevkitWeb, :router
 
+  # CSP is set by RevkitWeb.Plugs.ContentSecurityPolicy with a per-request
+  # nonce; Sobelow only recognizes put_secure_browser_headers/2.
+  # sobelow_skip ["Config.CSP"]
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
@@ -8,6 +11,7 @@ defmodule RevkitWeb.Router do
     plug :put_root_layout, html: {RevkitWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug RevkitWeb.Plugs.ContentSecurityPolicy
   end
 
   pipeline :api do
@@ -47,7 +51,7 @@ defmodule RevkitWeb.Router do
     scope "/dev" do
       pipe_through :browser
 
-      live_dashboard "/dashboard", metrics: RevkitWeb.Telemetry
+      live_dashboard "/dashboard", metrics: RevkitWeb.Telemetry, csp_nonce_assign_key: :csp_nonce
     end
   end
 end

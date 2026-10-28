@@ -19,6 +19,14 @@ defmodule RevkitWeb.GenerateLiveTest do
     assert html =~ "No recipe (identity)"
   end
 
+  test "serves the CSP nonce for the inline theme script", %{conn: conn} do
+    conn = get(conn, ~p"/generate")
+
+    assert [policy] = get_resp_header(conn, "content-security-policy")
+    assert [_, nonce] = Regex.run(~r/script-src 'self' 'nonce-([^']+)'/, policy)
+    assert html_response(conn, 200) =~ ~s(nonce="#{nonce}")
+  end
+
   test "previews a recipe on phx-change without writing to the database", %{conn: conn} do
     {:ok, recipe} =
       Catalog.create_recipe(%{
