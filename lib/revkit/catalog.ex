@@ -110,40 +110,41 @@ defmodule Revkit.Catalog do
     )
   end
 
-  @doc "Searches payloads by name, description, or template."
-  def search_payloads(query) when is_binary(query) and query != "" do
-    pattern = "%" <> String.downcase(String.trim(query)) <> "%"
+  @doc """
+  Searches payloads by name, description, or template.
 
-    Repo.all(
+  Options: `:favorite` (boolean) and `:tag_id` (integer).
+  """
+  def search_payloads(term, opts \\ []) do
+    query =
       from payload in Payload,
-        where:
-          fragment("LOWER(?) LIKE ?", payload.name, ^pattern) or
-            fragment("LOWER(?) LIKE ?", payload.description, ^pattern) or
-            fragment("LOWER(?) LIKE ?", payload.template, ^pattern),
         order_by: [asc: payload.name],
         preload: [:tags, :recipe]
-    )
+
+    query = filter_favorite(query, opts)
+    query = filter_tag(query, opts)
+    query = filter_payload_term(query, term)
+
+    Repo.all(query)
   end
 
-  def search_payloads(_query), do: list_payloads()
+  @doc """
+  Searches recipes by name, description, template, or notes.
 
-  @doc "Searches recipes by name, description, template, or notes."
-  def search_recipes(query) when is_binary(query) and query != "" do
-    pattern = "%" <> String.downcase(String.trim(query)) <> "%"
-
-    Repo.all(
+  Options: `:favorite` (boolean) and `:tag_id` (integer).
+  """
+  def search_recipes(term, opts \\ []) do
+    query =
       from recipe in Recipe,
-        where:
-          fragment("LOWER(?) LIKE ?", recipe.name, ^pattern) or
-            fragment("LOWER(?) LIKE ?", recipe.description, ^pattern) or
-            fragment("LOWER(?) LIKE ?", recipe.template, ^pattern) or
-            fragment("LOWER(?) LIKE ?", recipe.notes, ^pattern),
         order_by: [asc: recipe.name],
         preload: [:tags, :payload]
-    )
-  end
 
-  def search_recipes(_query), do: list_recipes()
+    query = filter_favorite(query, opts)
+    query = filter_tag(query, opts)
+    query = filter_recipe_term(query, term)
+
+    Repo.all(query)
+  end
 
   @doc "Gets a recipe with tags and source payload preloaded, or `nil`."
   def get_recipe(id), do: Repo.get(Recipe, id) |> preload_recipe()
@@ -284,6 +285,55 @@ defmodule Revkit.Catalog do
   def change_tag(%Tag{} = tag, attrs \\ %{}) do
     Tag.changeset(tag, attrs)
   end
+
+  defp filter_favorite(query, opts) do
+    if Keyword.get(opts, :favorite, false) do
+      where(query, [record], field(record, :favorite) == true)
+    else
+      query
+    end
+  end
+
+  defp filter_tag(query, opts) do
+    case Keyword.get(opts, :tag_id) do
+      nil ->
+        query
+
+      tag_id ->
+        query
+        |> join(:inner, [record], tag in assoc(record, :tags))
+        |> where([_record, tag], tag.id == ^tag_id)
+    end
+  end
+
+  defp filter_payload_term(query, term) when is_binary(term) and term != "" do
+    pattern = "%" <> String.downcase(String.trim(term)) <> "%"
+
+    where(
+      query,
+      [payload],
+      fragment("LOWER(?) LIKE ?", payload.name, ^pattern) or
+        fragment("LOWER(?) LIKE ?", payload.description, ^pattern) or
+        fragment("LOWER(?) LIKE ?", payload.template, ^pattern)
+    )
+  end
+
+  defp filter_payload_term(query, _term), do: query
+
+  defp filter_recipe_term(query, term) when is_binary(term) and term != "" do
+    pattern = "%" <> String.downcase(String.trim(term)) <> "%"
+
+    where(
+      query,
+      [recipe],
+      fragment("LOWER(?) LIKE ?", recipe.name, ^pattern) or
+        fragment("LOWER(?) LIKE ?", recipe.description, ^pattern) or
+        fragment("LOWER(?) LIKE ?", recipe.template, ^pattern) or
+        fragment("LOWER(?) LIKE ?", recipe.notes, ^pattern)
+    )
+  end
+
+  defp filter_recipe_term(query, _term), do: query
 
   defp replace_tags(record, changeset_fun, tag_ids) do
     tag_ids = Enum.uniq(tag_ids)

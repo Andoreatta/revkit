@@ -136,6 +136,23 @@ defmodule Revkit.CatalogTest do
       assert payload.favorite == true
     end
 
+    test "search_payloads/2 filters favorites and tags" do
+      {:ok, favorite} =
+        Catalog.create_payload_with_tags(
+          %{name: "Favorite Linux", template: "id", favorite: true},
+          ["linux"]
+        )
+
+      {:ok, _other} =
+        Catalog.create_payload_with_tags(%{name: "Other", template: "id"}, ["windows"])
+
+      assert [%{id: id}] = Catalog.search_payloads("", favorite: true)
+      assert id == favorite.id
+
+      [linux] = Enum.filter(Catalog.list_tags(), &(&1.name == "linux"))
+      assert [%{id: ^id}] = Catalog.search_payloads("", tag_id: linux.id)
+    end
+
     test "search_payloads/1 matches name, description, and template" do
       {:ok, _payload} =
         Catalog.create_payload(%{
