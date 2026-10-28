@@ -207,6 +207,9 @@ defmodule RevkitWeb.RecipeLiveTest do
         "template" => "id {{HOST}}",
         "notes" => "Keep this",
         "tags" => "unix",
+        "target_os" => "linux",
+        "target_shell" => "bash",
+        "target_tools_text" => "base64, bash",
         "steps" => %{"0" => %{"key" => "base64_encode"}}
       }
     })
@@ -217,6 +220,9 @@ defmodule RevkitWeb.RecipeLiveTest do
     assert recipe.template == "id {{HOST}}"
     assert recipe.notes == "Keep this"
     assert recipe.steps == [%{"key" => "base64_encode", "options" => %{}}]
+    assert recipe.target_os == "linux"
+    assert recipe.target_shell == "bash"
+    assert recipe.target_tools == ["base64", "bash"]
     assert Enum.map(recipe.tags, & &1.name) == ["unix"]
   end
 

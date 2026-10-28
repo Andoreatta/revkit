@@ -67,8 +67,7 @@ defmodule RevkitWeb.RecipeLive.Form do
 
   @impl true
   def handle_event("move_step", %{"id" => id, "direction" => direction}, socket) do
-    {:noreply,
-     assign(socket, :steps, StepEditor.move(socket.assigns.steps, id, direction))}
+    {:noreply, assign(socket, :steps, StepEditor.move(socket.assigns.steps, id, direction))}
   end
 
   @impl true
