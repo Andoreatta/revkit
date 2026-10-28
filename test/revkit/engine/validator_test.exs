@@ -42,6 +42,11 @@ defmodule Revkit.Engine.ValidatorTest do
     assert report.warnings == []
   end
 
+  test "normalizes target paths, case, and executable suffixes" do
+    assert Validator.validate([{BashWrapper, %{}}], %{shell: "/bin/BASH"}).compatible
+    assert Validator.validate([{BashWrapper, %{}}], %{tools: ["C:\\tools\\bash.exe"]}).compatible
+  end
+
   test "collects requirements with their source transforms" do
     report = Validator.validate([{BashWrapper, %{}}])
 

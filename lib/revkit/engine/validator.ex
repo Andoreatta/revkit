@@ -50,6 +50,8 @@ defmodule Revkit.Engine.Validator do
     capabilities = capabilities(target)
 
     Enum.flat_map(requires, fn %{name: name} ->
+      normalized = normalize_capability(name)
+
       cond do
         capabilities == [] ->
           [
@@ -59,7 +61,7 @@ defmodule Revkit.Engine.Validator do
             }
           ]
 
-        Enum.any?(capabilities, &(String.downcase(&1) == String.downcase(name))) ->
+        normalized in capabilities ->
           []
 
         true ->
@@ -83,7 +85,17 @@ defmodule Revkit.Engine.Validator do
     |> List.wrap()
     |> Enum.filter(&is_binary/1)
     |> Enum.reject(&(&1 == ""))
+    |> Enum.map(&normalize_capability/1)
     |> Enum.uniq()
+  end
+
+  defp normalize_capability(value) do
+    value
+    |> String.replace("\\", "/")
+    |> Path.basename()
+    |> String.downcase()
+    |> String.trim()
+    |> String.replace_suffix(".exe", "")
   end
 
   defp collect(chain, callback, key) do
