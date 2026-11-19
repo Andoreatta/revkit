@@ -1,0 +1,33 @@
+@startuml
+title RevKit — Sequência UC09: Favoritar Edição Privada
+skinparam maxMessageSize 120
+
+actor "Usuário" as user
+participant "PayloadLive.Index" as index
+participant "Catalog" as catalog
+participant "Repo" as repo
+database "SQLite" as db
+
+user -> index : clica no botão de favorito
+index -> catalog : toggle_payload_favorite(edition, owner_id)
+catalog -> catalog : owned?(edition, owner_id)
+
+alt edição do próprio cookie
+  catalog -> repo : update(favorite invertido)
+  repo -> db : UPDATE payloads
+  db --> repo : ok
+  repo --> catalog : {:ok, edição}
+  catalog --> index : {:ok, edição}
+  index --> user : botão de favorito atualizado
+else item público ou edição de outro cookie
+  catalog --> index : {:error, :forbidden}
+  index --> user : favorito indisponível\n(sem alteração no banco)
+end
+
+note over catalog, db
+  Favoritos existem apenas em
+  edições privadas; itens públicos
+  nunca recebem flag de usuário.
+end note
+
+@enduml

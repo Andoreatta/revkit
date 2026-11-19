@@ -27,15 +27,4 @@ live --> user : pré-visualização e avisos
 
 note over live, validator : A pré-visualização não grava no banco.
 
-opt Salvar receita
-  user -> live : solicita salvar receita
-  live -> catalog : create_recipe(owner_id, dados, tags)
-  catalog -> repo : insert
-  repo -> db : SQL
-  db --> repo : ok
-  repo --> catalog : receita
-  catalog --> live : {:ok, receita}
-  live --> user : receita salva
-end
-
 @enduml

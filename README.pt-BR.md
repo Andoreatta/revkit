@@ -89,12 +89,9 @@ docker compose down -v  # apaga o volume
 ## Documentação
 
 - [Documentação completa (PDF)](docs/documentacao.pdf)
-- [Diagramas do projeto](docs/diagramas/) — caso de uso, DER, arquitetura,
-  sequência e implantação.
-
-O PDF contém os Requisitos Funcionais e Não Funcionais, o Diagrama de Caso de
-Uso, o DER e os demais diagramas de apoio. Regenere os diagramas e o PDF com
-`./docs/build.sh`.
+- [Diagramas do projeto](docs/diagramas/) — caso de uso, atividade, classes,
+  DER, arquitetura, um diagrama de sequência por caso de uso (UC01–UC09) e
+  implantação. Regenere com `./docs/build.sh`.
 
 ## Vídeos de defesa
 

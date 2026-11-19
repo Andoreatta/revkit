@@ -1,0 +1,41 @@
+@startuml
+title RevKit — Diagrama de Atividade: Gerar Payload (UC03)
+skinparam maxMessageSize 120
+skinparam swimlaneWidth 200
+skinparam activityFontSize 13
+
+|Usuário|
+start
+:Seleciona o template do catálogo;
+:Preenche as variáveis e o alvo;
+:Configura a cadeia de transformações;
+
+|RevKit|
+:Renderiza o template e resolve a cadeia;
+repeat :Aplica a transformação atual;
+  if (Transformação OK?) then (não)
+    :Interrompe a cadeia e exibe o erro;
+    stop
+  endif
+repeat while (Existe próxima transformação?) is (sim) not (não)
+:Valida a compatibilidade com o alvo;
+:Exibe pré-visualização, requisitos e avisos;
+
+|Usuário|
+if (Copiar o payload?) then (sim)
+  :Copia via hook .CopyToClipboard;
+else (não)
+endif
+
+|RevKit|
+if (Salvar como receita?) then (sim)
+  if (Cota e dados válidos?) then (sim)
+    :Persiste a receita no SQLite;
+  else (não)
+    :Exibe erro de limite ou de formulário;
+  endif
+else (não)
+endif
+stop
+
+@enduml

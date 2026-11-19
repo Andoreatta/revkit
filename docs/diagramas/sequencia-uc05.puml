@@ -1,0 +1,38 @@
+@startuml
+title RevKit — Sequência UC05: Reabrir Receita Salva
+skinparam maxMessageSize 120
+
+actor "Usuário" as user
+participant "RecipeLive.Show" as show
+participant "GenerateLive" as live
+participant "Catalog" as catalog
+participant "Repo" as repo
+participant "Template" as template
+participant "Chain" as chain
+participant "Validator" as validator
+database "SQLite" as db
+
+user -> show : abre a receita salva
+show -> catalog : get_recipe!(id, owner_id)
+catalog -> repo : one(consulta com escopo por proprietário)
+repo -> db : SELECT recipes
+db --> repo : snapshot
+repo --> catalog : receita com tags e payload
+catalog --> show : receita visível ou 404
+
+user -> live : reabrir no gerador
+live -> live : restaura template, variáveis,\ncadeia, alvo, notas e tags
+live -> template : render(template, variáveis)
+template --> live : string renderizada
+live -> chain : run(string, cadeia)
+chain --> live : string transformada
+live -> validator : validate(cadeia, alvo)
+validator --> live : requisitos e avisos
+live --> user : mesma pré-visualização da geração salva
+
+note over live, validator
+  A reabertura não grava no banco:
+  apenas reproduz a combinação salva.
+end note
+
+@enduml

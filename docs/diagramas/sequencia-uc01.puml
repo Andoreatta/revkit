@@ -1,0 +1,26 @@
+@startuml
+title RevKit — Sequência UC01: Consultar Catálogo Público
+skinparam maxMessageSize 120
+
+actor "Usuário" as user
+participant "PayloadLive.Index" as index
+participant "Catalog" as catalog
+participant "Repo" as repo
+database "SQLite" as db
+
+user -> index : abre /payloads
+index -> catalog : list_payloads(owner_id)
+catalog -> repo : all(consulta com escopo por proprietário)
+repo -> db : SELECT payloads
+db --> repo : linhas públicas + edições do cookie
+repo --> catalog : payloads com tags pré-carregadas
+catalog --> index : lista ordenada por nome
+index --> user : catálogo público e edições próprias
+
+note over index, db
+  Itens públicos são somente leitura;
+  o cookie apenas adiciona as
+  edições privadas do próprio navegador.
+end note
+
+@enduml

@@ -1,0 +1,49 @@
+@startuml
+title RevKit — Sequência UC07: Editar ou Descartar Edição Privada
+skinparam maxMessageSize 120
+
+actor "Usuário" as user
+participant "PayloadLive.Form" as form
+participant "Catalog" as catalog
+participant "Repo" as repo
+database "SQLite" as db
+
+alt editar edição
+  user -> form : altera campos e envia
+  form -> catalog : update_payload(edition, owner_id, attrs, tag_ids)
+  catalog -> catalog : owned?(edition, owner_id)
+  alt edição do próprio cookie
+    catalog -> repo : update com changeset
+    repo -> db : UPDATE payloads
+    db --> repo : ok
+    repo --> catalog : {:ok, edição}
+    catalog --> form : {:ok, edição}
+    form --> user : edição atualizada
+  else edição de outro cookie ou pública
+    catalog --> form : {:error, :forbidden}
+    form --> user : erro de acesso
+  end
+else descartar edição
+  user -> form : solicita descartar
+  form -> catalog : discard_payload(edition, owner_id)
+  catalog -> catalog : owned?(edition, owner_id)
+  alt edição do próprio cookie
+    catalog -> repo : delete
+    repo -> db : DELETE payloads
+    db --> repo : ok
+    repo --> catalog : {:ok, edição}
+    catalog --> form : {:ok, edição}
+    form --> user : edição descartada;\nitem público permanece visível
+  else edição de outro cookie
+    catalog --> form : {:error, :forbidden}
+    form --> user : erro de acesso
+  end
+end
+
+note over form, db
+  Não existe exclusão ou edição
+  de itens públicos: apenas as
+  próprias edições podem mudar.
+end note
+
+@enduml

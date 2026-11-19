@@ -5,18 +5,32 @@
 
 #set page(
   paper: "a4",
-  margin: (x: 2.5cm, y: 2.4cm),
+  // NBR 14724: superior e esquerda 3 cm; inferior e direita 2 cm
+  margin: (top: 3cm, bottom: 2cm, left: 3cm, right: 2cm),
 )
 
 #set text(
   lang: "pt",
   font: "Libertinus Serif",
-  size: 11pt,
+  size: 12pt,
 )
 
-#set par(justify: true, leading: 0.7em)
+// NBR 14724: espaçamento 1,5 no corpo do texto
+#set par(justify: true, leading: 1em)
 
 #set heading(numbering: "1.1")
+
+// NBR 6022: título de figuras e tabelas acima, fonte abaixo
+#show figure: set figure.caption(position: top)
+#set figure.caption(separator: [ – ])
+
+// NBR 14724: indicação da fonte abaixo de figuras e tabelas
+#show figure: it => [
+  #it
+  #v(-0.6em)
+  #text(size: 10pt)[Fonte: elaborada pelos autores.]
+  #v(0.4em)
+]
 
 #show heading.where(level: 1): it => {
   v(0.6em)
@@ -78,7 +92,7 @@
 // Sumário
 // ---------------------------------------------------------------------------
 
-#set page(numbering: "i", number-align: center)
+#set page(numbering: none)
 
 #outline(title: [Sumário], indent: auto)
 
@@ -86,20 +100,11 @@
 
 #counter(page).update(1)
 
+// NBR 14724: número de página no canto superior direito;
+// páginas pré-textuais (capa e sumário) não são numeradas
 #set page(
-  numbering: "1",
-  number-align: center,
-  header: context {
-    set text(size: 8pt, fill: rgb("#6b7280"))
-    grid(
-      columns: (1fr, auto),
-      align: (left, right),
-      [RevKit — Documentação],
-      [Projeto de Desenvolvimento de Software I e II],
-    )
-    v(-0.35em)
-    line(length: 100%, stroke: 0.3pt + rgb("#d1d5db"))
-  },
+  numbering: none,
+  header: context align(right, text(size: 10pt)[#counter(page).display("1")]),
 )
 
 // ---------------------------------------------------------------------------
@@ -166,12 +171,6 @@ o acesso às edições privadas anteriores.
   caption: [Tecnologias utilizadas no projeto.],
   supplement: [Tabela],
 ) <tab-stack>
-
-== Organização do documento
-
-A Seção 2 apresenta os requisitos, os casos de uso, a arquitetura, o modelo de
-dados, as decisões de implementação e a verificação do sistema. A Seção 3
-apresenta a conclusão, os aprendizados, as limitações e os trabalhos futuros.
 
 // ---------------------------------------------------------------------------
 // 2 Desenvolvimento
@@ -275,18 +274,27 @@ a @tab-uc resume o objetivo e os requisitos relacionados de cada um.
   ) <tab-uc>
 ]
 
-O caso UC03 concentra a pré-visualização, a validação e a cópia, mas não grava
-no banco. A gravação ocorre apenas em UC04. UC05 restaura template, variáveis,
-cadeia, alvo, notas e tags. UC06 cria uma cópia privada sem modificar o item
-público. UC07 permite editar ou descartar somente a própria edição. UC08
-considera o catálogo público e as edições do cookie atual. UC09 permite
-favoritar apenas edições privadas.
+UC03 concentra a geração, a validação e a cópia em memória; a gravação no
+banco ocorre apenas em UC04.
 
 #figure(
-  image("diagramas/casos-de-uso.png", width: 100%),
+  image("diagramas/casos-de-uso.png", width: 80%),
   caption: [Diagrama de Caso de Uso do RevKit.],
   supplement: [Figura],
 ) <fig-caso>
+
+== Diagrama de Atividade
+
+O fluxo central do sistema é a geração de payloads (UC03). A @fig-atividade
+mostra esse fluxo nas raias do usuário e do sistema: a pré-visualização
+acontece inteiramente em memória, e a gravação no banco ocorre apenas quando
+o usuário decide salvar uma receita.
+
+#figure(
+  image("diagramas/atividade.png", width: 90%),
+  caption: [Diagrama de Atividade: geração, validação e salvamento de receita.],
+  supplement: [Figura],
+) <fig-atividade>
 
 == Arquitetura
 
@@ -306,10 +314,6 @@ Os diretórios principais são:
 - `lib/revkit/engine/` — motor puro de transformação de strings, sem Ecto ou Phoenix.
 - `lib/revkit/catalog/` — schemas Ecto e contexto `Revkit.Catalog`; persistência SQLite e escopo por proprietário.
 - `lib/revkit_web/` — interface Phoenix/LiveView, rotas, componentes e identidade por cookie.
-
-A direção das dependências é intencional: o motor não conhece a interface nem a
-persistência. Isso permite testar template, cadeia e validação sem banco de
-dados e sem processo web.
 
 == Modelo de dados e DER
 
@@ -348,6 +352,20 @@ armazenados como `TEXT`, e `BOOLEAN` como `INTEGER`.
   supplement: [Figura],
 ) <fig-der>
 
+== Diagrama de Classes
+
+O @fig-classes apresenta as entidades de domínio. `Payload`, `Recipe` e `Tag`
+são os schemas Ecto de `lib/revkit/catalog/`; o contexto `Revkit.Catalog`
+concentra as operações visíveis para a interface e é o único módulo que acessa
+`Revkit.Repo`. As autorelações `source_payload_id` e `source_recipe_id`
+representam as edições privadas de um item público.
+
+#figure(
+  image("diagramas/classes.png", width: 100%),
+  caption: [Diagrama de Classes focado nas entidades.],
+  supplement: [Figura],
+) <fig-classes>
+
 == Motor de transformação
 
 O motor é composto por quatro módulos principais:
@@ -360,7 +378,8 @@ O motor é composto por quatro módulos principais:
 As transformações disponíveis estão resumidas na @tab-transforms. A
 pré-visualização renderiza o template, resolve a cadeia, executa as
 transformações e valida o resultado em memória. Nenhuma etapa grava no banco ou
-executa o payload. A @fig-seq mostra o fluxo.
+executa o payload; o fluxo completo aparece na @fig-seq, na seção de diagramas
+de sequência.
 
 #figure(
   table(
@@ -376,20 +395,72 @@ executa o payload. A @fig-seq mostra o fluxo.
   supplement: [Tabela],
 ) <tab-transforms>
 
+== Diagramas de Sequência por Caso de Uso
+
+Cada caso de uso tem um diagrama de sequência próprio, do UC01 ao UC09. Todos
+seguem a mesma direção de dependência: `RevkitWeb → Catalog → Repo` e
+`RevkitWeb → Engine`, sem atalhos.
+
+#figure(
+  image("diagramas/sequencia-uc01.png", width: 85%),
+  caption: [UC01 — Consultar catálogo público.],
+  supplement: [Figura],
+) <fig-uc01>
+
+#figure(
+  image("diagramas/sequencia-uc02.png", width: 80%),
+  caption: [UC02 — Criar payload privado.],
+  supplement: [Figura],
+) <fig-uc02>
+
 #figure(
   image("diagramas/sequencia-geracao.png", width: 100%),
-  caption: [Sequência de geração e pré-visualização.],
+  caption: [UC03 — Gerar payload: geração e pré-visualização.],
   supplement: [Figura],
 ) <fig-seq>
 
+#figure(
+  image("diagramas/sequencia-uc04.png", width: 80%),
+  caption: [UC04 — Salvar receita.],
+  supplement: [Figura],
+) <fig-uc04>
+
+#figure(
+  image("diagramas/sequencia-uc05.png", width: 85%),
+  caption: [UC05 — Reabrir receita salva.],
+  supplement: [Figura],
+) <fig-uc05>
+
+#figure(
+  image("diagramas/sequencia-uc06.png", width: 80%),
+  caption: [UC06 — Criar edição privada.],
+  supplement: [Figura],
+) <fig-uc06>
+
+#figure(
+  image("diagramas/sequencia-uc07.png", width: 72%),
+  caption: [UC07 — Editar ou descartar edição privada.],
+  supplement: [Figura],
+) <fig-uc07>
+
+#figure(
+  image("diagramas/sequencia-uc08.png", width: 80%),
+  caption: [UC08 — Pesquisar e filtrar catálogo.],
+  supplement: [Figura],
+) <fig-uc08>
+
+#figure(
+  image("diagramas/sequencia-uc09.png", width: 80%),
+  caption: [UC09 — Favoritar edição privada.],
+  supplement: [Figura],
+) <fig-uc09>
+
 == Catálogo e edições privadas
 
-O catálogo público é composto por oito payloads e seis receitas iniciais. Ele é
-somente leitura: o botão *Improve* (Melhorar) copia um item para uma edição
-privada e vincula a cópia ao cookie atual. Uma edição pode ser editada ou
-descartada, mas
-o item público permanece visível para todos os navegadores. O índice único
-`(owner_id, source_payload_id)` e o equivalente para receitas garantem uma
+O catálogo inicial tem oito payloads e seis receitas. Ele é somente leitura: o
+botão *Improve* copia um item público para uma edição privada vinculada ao
+cookie atual, sem alterar o original. Os índices únicos
+`(owner_id, source_payload_id)` — e o equivalente para receitas — garantem uma
 edição por item público e por cookie.
 
 As tags formam um vocabulário fixo de 24 nomes. Cada payload ou receita pode usar
@@ -431,10 +502,9 @@ interface se adapta de 320 px a 1440 px e usa componentes compartilhados para
 estados vazios, metadados, tags, favoritos e blocos de código.
 
 A segurança segue o escopo do projeto: o sistema gera strings, mas não as
-executa. A aplicação usa CSP com nonce, cookie assinado `HttpOnly` e
-`SameSite=Lax`, e não expõe API JSON. Como não há autenticação, o cookie é
-identidade de escopo, não controle de acesso. Em uma implantação pública, o
-acesso deve ser protegido por rede ou proxy autenticado (OWASP, 2026).
+executa, e não expõe API JSON. Sem autenticação, o cookie define o escopo, não
+o acesso; em uma implantação pública, o acesso deve ser protegido por rede ou
+proxy autenticado (OWASP, 2026).
 
 == Testes, qualidade e implantação
 
@@ -479,16 +549,14 @@ pré-visualização, validação e cópia. A implementação manteve a geração
 strings separada da execução e documentou as decisões de escopo e segurança.
 
 Aprendemos a importância de separar um domínio puro das camadas de interface e
-persistência. Essa separação tornou o motor simples de testar e permitiu que a
-pré-visualização no LiveView fosse rápida e previsível. Também aprofundamos o uso
-de LiveView para estado, formulários e atualizações em tempo real, de Ecto e
-SQLite para migrations e consultas com escopo, e de testes automatizados para
-verificar comportamentos de cookie.
-
-Aprendemos, ainda, que decisões de produto afetam a arquitetura: tornar o catálogo
-público somente leitura exigiu um modelo de edições privadas; limitar tags e
-campos exigiu uma fonte única de limites; e a ausência de autenticação tornou
-necessário documentar claramente que o cookie não é uma barreira de segurança.
+persistência: isso tornou o motor simples de testar e a pré-visualização no
+LiveView rápida e previsível. Aprofundamos o uso de LiveView para estado,
+formulários e atualizações em tempo real, de Ecto e SQLite para migrations e
+consultas com escopo, e de testes automatizados para verificar comportamentos
+de cookie. Vimos, ainda, que decisões de produto moldam a arquitetura: o
+catálogo somente leitura exigiu edições privadas; os limites exigiram uma fonte
+única (`Revkit.Limits`); e a ausência de autenticação exigiu deixar claro que o
+cookie não é uma barreira de segurança.
 
 As principais limitações são a ausência de contas e autenticação, a perda das
 edições ao apagar o cookie, a ausência de exclusão do catálogo público e o uso de
@@ -504,8 +572,8 @@ receitas, novas transformações, integração contínua e proteção TLS em pro
 
 #heading(level: 1, numbering: none)[Referências]
 
-#set text(size: 10pt)
-#set par(hanging-indent: 1.5em)
+// NBR 6023: mesma fonte do texto, espaçamento simples, alinhadas à esquerda
+#set par(leading: 0.7em, justify: false)
 
 ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. *NBR 6023*: informação e documentação: referências: elaboração. Rio de Janeiro: ABNT, 2018.
 

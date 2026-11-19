@@ -1,0 +1,28 @@
+@startuml
+title RevKit — Sequência UC08: Pesquisar e Filtrar Catálogo
+skinparam maxMessageSize 120
+
+actor "Usuário" as user
+participant "PayloadLive.Index" as index
+participant "Catalog" as catalog
+participant "Repo" as repo
+database "SQLite" as db
+
+user -> index : digita termo, marca favoritos\nou seleciona tag
+index -> catalog : search_payloads(owner_id, term, opts)
+catalog -> catalog : normaliza termo (trim, caixa, limite)
+catalog -> catalog : aplica escopo por proprietário,\nfiltro de favoritos e de tag
+catalog -> repo : all(consulta com LIKE)
+repo -> db : SELECT com filtros
+db --> repo : linhas públicas + edições do cookie
+repo --> catalog : resultados
+catalog --> index : payloads filtrados
+index --> user : resultados da busca
+
+note over index, db
+  A busca considera itens públicos
+  e apenas as edições privadas do
+  cookie atual (RF12).
+end note
+
+@enduml

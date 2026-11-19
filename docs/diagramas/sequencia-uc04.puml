@@ -1,0 +1,36 @@
+@startuml
+title RevKit — Sequência UC04: Salvar Receita
+skinparam maxMessageSize 120
+
+actor "Usuário" as user
+participant "GenerateLive" as live
+participant "Catalog" as catalog
+participant "Repo" as repo
+database "SQLite" as db
+
+user -> live : solicita salvar receita
+live -> live : coleta template, variáveis,\ncadeia, alvo, notas, tags e favorito
+live -> catalog : create_recipe(owner_id, attrs, tag_ids)
+catalog -> catalog : require_owner + cota de receitas privadas
+
+alt cota excedida
+  catalog --> live : {:error, :limit_reached}
+  live --> user : erro de limite
+else dados inválidos
+  catalog --> live : {:error, changeset}
+  live --> user : erros do formulário
+else gravação
+  catalog -> repo : transaction: insert + replace_tags
+  repo -> db : INSERT recipes + recipes_tags
+  db --> repo : ok
+  repo --> catalog : {:ok, recipe}
+  catalog --> live : {:ok, recipe}
+  live --> user : receita salva
+end
+
+note over live, db
+  O snapshot persiste a combinação
+  completa da geração para reabertura.
+end note
+
+@enduml

@@ -10,8 +10,8 @@ rectangle "RevKit" {
   usecase "Pesquisar e filtrar catálogo" as UC8
   usecase "Editar ou descartar\nedição privada" as UC7
   usecase "Criar edição privada" as UC6
-  usecase "Reabrir receita salva" as UC5
-  usecase "Salvar receita de geração" as UC4
+  usecase "Reabrir receita" as UC5
+  usecase "Salvar receita" as UC4
   usecase "Gerar payload" as UC3
   usecase "Criar payload privado" as UC2
   usecase "Consultar catálogo público" as UC1

@@ -1,15 +1,17 @@
 Read this in: [English](README.md) | [Português (Brasil)](README.pt-BR.md)
 
-> For course evaluation, including the required identification, see the
-> [Portuguese version](README.pt-BR.md).
-
 # RevKit
 
 RevKit is a Phoenix/LiveView payload studio for composing, validating, and
 copying offensive-security payload strings for authorized testing. It is a
 pure-string pipeline: it never executes or spawns a payload.
 
-This is a two-person course project for Software Development I and II.
+## Identification
+
+- **Course:** Software Development Project I and II
+- **Mode:** Pair project
+- **Authors:** Lucas Andreatta and Leandro Sakae Kobayashi Ostruka
+- **Repository:** https://github.com/andoreatta/revkit
 
 ## Status
 
@@ -86,12 +88,9 @@ docker compose down -v  # deletes the volume
 ## Documentation
 
 - [Full documentation (PDF)](docs/documentacao.pdf)
-- [Project diagrams](docs/diagramas/) — Use Case, DER, architecture,
-  sequence, and deployment (Portuguese labels).
-
-The PDF contains the Functional and Non-Functional Requirements, the Use Case
-Diagram, the ERD, and the supporting diagrams. Regenerate the diagrams and PDF
-with `./docs/build.sh`.
+- [Project diagrams](docs/diagramas/) — Use Case, activity, class, DER,
+  architecture, one sequence diagram per use case (UC01–UC09), and
+  deployment (Portuguese labels). Regenerate with `./docs/build.sh`.
 
 ## Defense videos
 

@@ -1,0 +1,39 @@
+@startuml
+title RevKit — Sequência UC06: Criar Edição Privada (Improve)
+skinparam maxMessageSize 120
+
+actor "Usuário" as user
+participant "PayloadLive.Show" as show
+participant "Catalog" as catalog
+participant "Repo" as repo
+database "SQLite" as db
+
+user -> show : clica em Improve no item público
+show -> catalog : improve_payload(source, owner_id)
+catalog -> repo : get_by(owner_id, source_payload_id)
+
+alt edição já existe
+  repo --> catalog : edição existente
+  catalog --> show : {:ok, edição}
+else sem edição
+  catalog -> catalog : verifica cota de edições privadas
+  alt cota excedida
+    catalog --> show : {:error, :limit_reached}
+    show --> user : erro de limite
+  else cota disponível
+    catalog -> repo : transaction: copia campos,\ntags e referência, com source_payload_id
+    repo -> db : INSERT payloads + payloads_tags
+    db --> repo : ok
+    repo --> catalog : {:ok, edição}
+    catalog --> show : {:ok, edição}
+    show --> user : abre a edição privada para edição
+  end
+end
+
+note over catalog, db
+  O item público nunca é alterado:
+  a cópia recebe owner_id e
+  source_payload_id do original.
+end note
+
+@enduml

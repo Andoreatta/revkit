@@ -1,0 +1,35 @@
+@startuml
+title RevKit — Sequência UC02: Criar Payload Privado
+skinparam maxMessageSize 120
+
+actor "Usuário" as user
+participant "PayloadLive.Form" as form
+participant "Catalog" as catalog
+participant "Repo" as repo
+database "SQLite" as db
+
+user -> form : preenche template, alvo, notas e tags
+user -> form : envia o formulário
+form -> catalog : create_payload(owner_id, attrs, tag_ids)
+catalog -> catalog : require_owner(owner_id)
+catalog -> catalog : verifica cota de edições privadas
+
+alt cota excedida
+  catalog --> form : {:error, :limit_reached}
+  form --> user : erro de limite
+else cota disponível
+  catalog -> catalog : valida attrs (Payload.changeset)
+  catalog -> repo : transaction: insert + replace_tags
+  repo -> db : INSERT payloads + payloads_tags
+  db --> repo : ok
+  repo --> catalog : {:ok, payload}
+  catalog --> form : {:ok, payload}
+  form --> user : redireciona para a página do payload
+end
+
+note over catalog, db
+  A criação sempre grava owner_id:
+  o catálogo público permanece intacto.
+end note
+
+@enduml

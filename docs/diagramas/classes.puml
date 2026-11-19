@@ -1,0 +1,113 @@
+@startuml
+title RevKit — Diagrama de Classes (entidades)
+skinparam maxMessageSize 120
+skinparam classAttributeIconSize 0
+
+class Payload {
+  +id : integer
+  +name : string
+  +description : string
+  +template : string
+  +target_os : string
+  +target_shell : string
+  +target_tools : string[]
+  +notes : string
+  +favorite : boolean
+  +owner_id : string
+  +recipe_id : integer
+  +source_payload_id : integer
+  +inserted_at : datetime
+  +updated_at : datetime
+  +changeset(payload, attrs)
+  +tags_changeset(payload, tags)
+}
+
+class Recipe {
+  +id : integer
+  +name : string
+  +description : string
+  +template : string
+  +variables : map<string, string>
+  +steps : array<map<string, map>>
+  +notes : string
+  +favorite : boolean
+  +target_os : string
+  +target_shell : string
+  +target_tools : string[]
+  +owner_id : string
+  +payload_id : integer
+  +source_recipe_id : integer
+  +inserted_at : datetime
+  +updated_at : datetime
+  +changeset(recipe, attrs)
+  +tags_changeset(recipe, tags)
+}
+
+class Tag {
+  +id : integer
+  +name : string
+  +inserted_at : datetime
+  +updated_at : datetime
+  +changeset(tag, attrs)
+}
+
+class PayloadsTags {
+  +payload_id : integer <<PK>>
+  +tag_id : integer <<PK>>
+}
+
+class RecipesTags {
+  +recipe_id : integer <<PK>>
+  +tag_id : integer <<PK>>
+}
+
+class Catalog {
+  +list_payloads(owner_id)
+  +get_payload(id, owner_id)
+  +create_payload(owner_id, attrs, tag_ids)
+  +update_payload(payload, owner_id, attrs, tag_ids)
+  +discard_payload(payload, owner_id)
+  +improve_payload(source, owner_id)
+  +toggle_payload_favorite(payload, owner_id)
+  +search_payloads(owner_id, term, opts)
+  +list_recipes(owner_id)
+  +get_recipe(id, owner_id)
+  +create_recipe(owner_id, attrs, tag_ids)
+  +update_recipe(recipe, owner_id, attrs, tag_ids)
+  +discard_recipe(recipe, owner_id)
+  +improve_recipe(source, owner_id)
+  +toggle_recipe_favorite(recipe, owner_id)
+  +search_recipes(owner_id, term, opts)
+  +list_tags()
+  +ensure_tags(names)
+}
+
+note bottom of Catalog
+  Contexto de domínio: único
+  módulo que acessa Revkit.Repo.
+end note
+
+Payload "1" *-- "0..*" PayloadsTags
+Tag "1" *-- "0..*" PayloadsTags
+Recipe "1" *-- "0..*" RecipesTags
+Tag "1" *-- "0..*" RecipesTags
+
+Payload "1" --> "0..*" Recipe : payload_id
+Payload "0..1" --> "0..1" Recipe : recipe_id
+
+Payload "0..1" --> "0..1" Payload : source_payload_id
+Recipe "0..1" --> "0..1" Recipe : source_recipe_id
+
+note right of Payload
+  owner_id nulo identifica uma
+  linha do catálogo público,
+  imutável para o usuário.
+end note
+
+note right of Recipe
+  Snapshot completo da geração:
+  reabrir reproduz a mesma
+  combinação salva.
+end note
+
+@enduml
